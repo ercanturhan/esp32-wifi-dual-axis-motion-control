@@ -137,7 +137,13 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
             display: block;
         }
 
-        .dashboard-grid,
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(300px, 1fr));
+            align-items: stretch;
+            gap: 18px;
+        }
+
         .settings-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
@@ -284,8 +290,12 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
 
         .relay-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            grid-template-columns: 1fr;
             gap: 14px;
+        }
+
+        .relay-card .stat-grid {
+            grid-template-columns: 1fr;
         }
 
         .btn,
@@ -355,6 +365,12 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
             text-align: center;
             color: var(--muted);
             font-size: 0.78rem;
+        }
+
+        @media (max-width: 1080px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
         }
 
         @media (max-width: 720px) {
@@ -532,7 +548,7 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
                 </div>
             </article>
 
-            <article class="card wide-card">
+            <article class="card relay-card">
                 <div class="card-title">
                     <div>
                         <h2>Timed Relay Outputs</h2>
