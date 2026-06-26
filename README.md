@@ -1,6 +1,6 @@
-# ESP32 Dual Axis Motion Control
+# ESP32 WiFi Dual Axis Motion Control
 
-ESP32 firmware for controlling two stepper motors with DRV8825 drivers from an embedded web dashboard. The interface provides live WebSocket telemetry, absolute movement, jog movement, homing, driver enable control, Wi-Fi configuration, and two timed relay outputs.
+ESP32 firmware for controlling two stepper motors with DRV8825 drivers from an embedded WiFi web dashboard. The interface provides live WebSocket telemetry, absolute movement, jog movement, homing, driver enable control, Wi-Fi configuration, and two timed relay outputs.
 
 ![Dashboard preview](docs/dashboard-preview.png)
 
@@ -11,7 +11,7 @@ ESP32 firmware for controlling two stepper motors with DRV8825 drivers from an e
 - Active-low home switch inputs with a two-stage homing routine.
 - Software min/max travel limits.
 - Position units: pulses, mm, cm, or degrees.
-- ESP32 access point plus optional station Wi-Fi mode.
+- Wireless control through ESP32 AP mode and optional STA mode on an existing Wi-Fi network.
 - WebSocket dashboard telemetry at about 5 Hz.
 - Timed relay output control from the dashboard.
 - NVS storage for motor settings, Wi-Fi credentials, and last known positions.
@@ -58,7 +58,9 @@ Do not connect relay coils directly to ESP32 GPIO pins. Use a relay module with 
 
 ## Web Dashboard
 
-After uploading the firmware, connect to the ESP32 access point:
+After uploading the firmware, the controller can be reached wirelessly in two ways. In AP mode, the ESP32 creates its own network so a phone, tablet, or computer can connect directly. In STA mode, saved Wi-Fi credentials allow the ESP32 to join an existing router network, so the dashboard can be opened from the ESP32 address assigned by that network.
+
+For direct AP mode access, connect to the ESP32 access point:
 
 - SSID: `ESP32-MOTOR`
 - Password: `12345678`
