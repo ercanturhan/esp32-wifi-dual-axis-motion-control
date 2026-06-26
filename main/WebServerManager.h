@@ -9,11 +9,13 @@
 #include "Config.h"
 #include "StorageManager.h"
 #include "MotorController.h"
+#include "RelayController.h"
 #include "index_html.h"
 
 class WebServerManager {
 public:
-    WebServerManager(StorageManager& storage, MotorController& m1, MotorController& m2);
+    WebServerManager(StorageManager& storage, MotorController& m1, MotorController& m2,
+                     RelayController& r1, RelayController& r2);
     
     void begin();
     void update();
@@ -28,6 +30,8 @@ private:
     StorageManager& _storage;
     MotorController& _m1;
     MotorController& _m2;
+    RelayController& _r1;
+    RelayController& _r2;
     
     AsyncWebServer _server;
     AsyncWebSocket _ws;

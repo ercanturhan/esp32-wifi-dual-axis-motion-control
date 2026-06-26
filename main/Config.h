@@ -21,6 +21,11 @@
 #define M2_M1_PIN      17
 #define M2_M2_PIN      22
 
+// Timed Relay Output Pins
+#define RELAY1_PIN     23
+#define RELAY2_PIN     5
+#define RELAY_ACTIVE_HIGH true
+
 // AP WiFi Defaults
 #define AP_SSID "ESP32-MOTOR"
 #define AP_PASS "12345678"

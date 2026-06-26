@@ -3,6 +3,7 @@
 #include "Config.h"
 #include "StorageManager.h"
 #include "MotorController.h"
+#include "RelayController.h"
 #include "WebServerManager.h"
 
 // Hardware Timer Engine for FastAccelStepper
@@ -12,7 +13,9 @@ FastAccelStepperEngine engine = FastAccelStepperEngine();
 StorageManager storage;
 MotorController motor1;
 MotorController motor2;
-WebServerManager webServer(storage, motor1, motor2);
+RelayController relay1;
+RelayController relay2;
+WebServerManager webServer(storage, motor1, motor2, relay1, relay2);
 
 // Configuration copies
 MotorConfig m1Cfg;
@@ -67,11 +70,17 @@ void setup() {
     motor2.setEnableTimeout(sysCfg.enableTimeoutActive, sysCfg.enableTimeoutDuration);
     Serial.println("Motor controllers initialized and coordinates restored.");
 
-    // 6. Initialize Web server and AP+STA Wi-Fi
-    webServer.begin();
-    webServer.queueLog("Sistem basariyla yuklendi.");
+    // 6. Initialize timed relay outputs
+    relay1.begin(1, RELAY1_PIN, RELAY_ACTIVE_HIGH);
+    relay2.begin(2, RELAY2_PIN, RELAY_ACTIVE_HIGH);
+    Serial.printf("Relay 1 initialized on GPIO%d.\n", RELAY1_PIN);
+    Serial.printf("Relay 2 initialized on GPIO%d.\n", RELAY2_PIN);
 
-    // 7. Initialize Task Watchdog (10 seconds timeout)
+    // 7. Initialize Web server and AP+STA Wi-Fi
+    webServer.begin();
+    webServer.queueLog("System loaded successfully.");
+
+    // 8. Initialize Task Watchdog (10 seconds timeout)
     Serial.println("Configuring Task Watchdog...");
     #if ESP_IDF_VERSION_MAJOR >= 5
         esp_task_wdt_config_t wdt_config;
@@ -94,10 +103,14 @@ void loop() {
     motor1.update();
     motor2.update();
 
-    // 3. Update Web Server events & WebSocket Broadcasts
+    // 3. Update timed relay outputs
+    relay1.update();
+    relay2.update();
+
+    // 4. Update Web Server events & WebSocket Broadcasts
     webServer.update();
 
-    // 4. Smart NVS Position Auto-Save
+    // 5. Smart NVS Position Auto-Save
     long currPos1 = motor1.getCurrentPosition();
     long currPos2 = motor2.getCurrentPosition();
 
@@ -111,7 +124,7 @@ void loop() {
                 storage.savePositions(currPos1, currPos2);
                 lastSavedPos1 = currPos1;
                 lastSavedPos2 = currPos2;
-                webServer.queueLog("Koordinatlar flash bellege kaydedildi.");
+                webServer.queueLog("Coordinates saved to flash memory.");
             }
         }
     }

@@ -5,26 +5,23 @@
 
 const char INDEX_HTML[] PROGMEM = R"rawhtml(
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ESP32 Dual Axis Motion Control Dashboard</title>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <title>ESP32 Dual Axis Motion Control</title>
     <style>
         :root {
-            --bg-color: #0b0f19;
-            --card-bg: rgba(20, 30, 55, 0.65);
-            --card-border: rgba(255, 255, 255, 0.08);
+            --bg: #0b0f19;
+            --panel: rgba(20, 30, 55, 0.72);
+            --panel-2: rgba(255, 255, 255, 0.04);
+            --border: rgba(255, 255, 255, 0.1);
+            --text: #f3f4f6;
+            --muted: #9ca3af;
             --primary: #3b82f6;
-            --primary-glow: rgba(59, 130, 246, 0.4);
             --success: #10b981;
-            --success-glow: rgba(16, 185, 129, 0.4);
             --danger: #ef4444;
-            --danger-glow: rgba(239, 68, 68, 0.5);
             --warning: #f59e0b;
-            --text-main: #f3f4f6;
-            --text-muted: #9ca3af;
             --accent: #8b5cf6;
         }
 
@@ -32,344 +29,104 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
             box-sizing: border-box;
             margin: 0;
             padding: 0;
-            font-family: 'Outfit', sans-serif;
-            -webkit-tap-highlight-color: transparent;
+            font-family: Inter, Segoe UI, Arial, sans-serif;
         }
 
         body {
-            background-color: var(--bg-color);
-            background-image: 
-                radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.15) 0px, transparent 50%),
-                radial-gradient(at 100% 100%, rgba(139, 92, 246, 0.15) 0px, transparent 50%);
-            background-attachment: fixed;
-            color: var(--text-main);
             min-height: 100vh;
-            display: flex;
-            flex-direction: column;
+            background:
+                radial-gradient(circle at top left, rgba(59, 130, 246, 0.16), transparent 32rem),
+                radial-gradient(circle at bottom right, rgba(16, 185, 129, 0.12), transparent 30rem),
+                var(--bg);
+            color: var(--text);
             padding: 20px;
         }
 
         header {
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            padding-bottom: 20px;
-            border-bottom: 1px solid var(--card-border);
-            margin-bottom: 20px;
+            justify-content: space-between;
+            gap: 16px;
+            padding-bottom: 18px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 18px;
             flex-wrap: wrap;
-            gap: 15px;
         }
 
-        .logo-area h1 {
-            font-size: 1.5rem;
+        h1 {
+            font-size: 1.45rem;
+            font-weight: 750;
+        }
+
+        h2 {
+            font-size: 1.05rem;
             font-weight: 700;
-            background: linear-gradient(135deg, #60a5fa, #c084fc);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+        }
+
+        h3 {
+            font-size: 0.95rem;
+            font-weight: 700;
+        }
+
+        .header-actions {
             display: flex;
             align-items: center;
             gap: 10px;
+            flex-wrap: wrap;
         }
 
         .status-badge {
             display: inline-flex;
             align-items: center;
-            gap: 6px;
-            padding: 6px 12px;
-            border-radius: 9999px;
-            font-size: 0.85rem;
-            font-weight: 500;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid var(--card-border);
-        }
-
-        .status-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background-color: var(--danger);
-        }
-
-        .status-dot.connected {
-            background-color: var(--success);
-            box-shadow: 0 0 8px var(--success-glow);
-        }
-
-        .emergency-btn {
-            background: linear-gradient(135deg, #ef4444, #b91c1c);
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 12px;
-            font-weight: 700;
-            font-size: 1rem;
-            cursor: pointer;
-            box-shadow: 0 4px 15px var(--danger-glow);
-            transition: all 0.2s ease;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        .emergency-btn:hover {
-            transform: scale(1.03);
-            box-shadow: 0 6px 20px var(--danger-glow);
-        }
-
-        .emergency-btn:active {
-            transform: scale(0.97);
-        }
-
-        .dashboard-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-            gap: 20px;
-            flex-grow: 1;
-        }
-
-        .card {
-            background: var(--card-bg);
-            border: 1px solid var(--card-border);
-            border-radius: 20px;
-            padding: 20px;
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            transition: border-color 0.3s ease;
-        }
-
-        .card:hover {
-            border-color: rgba(255, 255, 255, 0.15);
-        }
-
-        .card-title {
-            font-size: 1.15rem;
-            font-weight: 600;
-            color: var(--text-main);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-            padding-bottom: 10px;
-        }
-
-        .card-subtitle {
-            font-size: 0.85rem;
-            color: var(--text-muted);
-        }
-
-        .stat-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
-        }
-
-        .stat-box {
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            padding: 10px;
-            border-radius: 12px;
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-
-        .stat-label {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            text-transform: uppercase;
-        }
-
-        .stat-value {
-            font-size: 1.2rem;
-            font-weight: 700;
-            color: var(--text-main);
-        }
-
-        .stat-unit {
-            font-size: 0.8rem;
-            font-weight: 400;
-            color: var(--text-muted);
-            margin-left: 2px;
-        }
-
-        .motor-controls {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 10px;
-        }
-
-        .btn {
-            background: rgba(255, 255, 255, 0.06);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            color: var(--text-main);
-            padding: 10px;
-            border-radius: 10px;
-            font-size: 0.9rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-        }
-
-        .btn:hover {
-            background: rgba(255, 255, 255, 0.15);
-            border-color: rgba(255, 255, 255, 0.2);
-        }
-
-        .btn:active {
-            transform: scale(0.97);
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, #2563eb, #1d4ed8);
-            border: none;
-            box-shadow: 0 4px 10px rgba(37, 99, 235, 0.3);
-        }
-
-        .btn-primary:hover {
-            background: linear-gradient(135deg, #3b82f6, #2563eb);
-            box-shadow: 0 6px 14px rgba(37, 99, 235, 0.4);
-        }
-
-        .btn-success {
-            background: linear-gradient(135deg, #059669, #047857);
-            border: none;
-            box-shadow: 0 4px 10px rgba(5, 150, 105, 0.3);
-        }
-
-        .btn-success:hover {
-            background: linear-gradient(135deg, #10b981, #059669);
-        }
-
-        .btn-warning {
-            background: linear-gradient(135deg, #d97706, #b45309);
-            border: none;
-        }
-
-        .btn-warning:hover {
-            background: linear-gradient(135deg, #f59e0b, #d97706);
-        }
-
-        .btn-danger {
-            background: linear-gradient(135deg, #dc2626, #b91c1c);
-            border: none;
-        }
-
-        .btn-danger:hover {
-            background: linear-gradient(135deg, #ef4444, #dc2626);
-        }
-
-        .input-group {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-
-        .input-group label {
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            font-weight: 500;
-        }
-
-        .input-with-btn {
-            display: flex;
             gap: 8px;
-        }
-
-        .input-with-btn input {
-            flex-grow: 1;
-        }
-
-        input, select {
-            background: rgba(255, 255, 255, 0.04);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 10px;
-            padding: 10px 12px;
-            color: var(--text-main);
-            font-size: 0.95rem;
-            transition: all 0.2s ease;
-            outline: none;
-        }
-
-        input:focus, select:focus {
-            border-color: var(--primary);
-            background: rgba(255, 255, 255, 0.07);
-            box-shadow: 0 0 0 3px var(--primary-glow);
-        }
-
-        .progress-container {
-            width: 100%;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 9999px;
-            height: 10px;
-            overflow: hidden;
-            position: relative;
-        }
-
-        .progress-bar {
-            height: 100%;
-            width: 0%;
-            background: linear-gradient(90deg, var(--primary), var(--accent));
-            border-radius: 9999px;
-            transition: width 0.3s ease;
-        }
-
-        .badge {
-            padding: 3px 8px;
-            border-radius: 6px;
-            font-size: 0.75rem;
+            padding: 7px 12px;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            background: var(--panel-2);
+            color: var(--muted);
+            font-size: 0.86rem;
             font-weight: 600;
-            text-transform: uppercase;
         }
 
-        .badge-idle { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
-        .badge-moving { background: rgba(16, 185, 129, 0.15); color: #34d399; }
-        .badge-homing { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
-        .badge-disabled { background: rgba(156, 163, 175, 0.15); color: #d1d5db; }
-        .badge-error { background: rgba(239, 68, 68, 0.15); color: #fca5a5; }
-
+        .status-dot,
         .indicator {
-            width: 12px;
-            height: 12px;
+            width: 10px;
+            height: 10px;
             border-radius: 50%;
             display: inline-block;
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.18);
         }
 
+        .status-dot.connected,
         .indicator.active {
             background: var(--success);
-            box-shadow: 0 0 8px var(--success-glow);
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
         }
 
         .tabs {
             display: flex;
             gap: 10px;
-            margin-bottom: 20px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-            padding-bottom: 10px;
+            padding-bottom: 14px;
+            margin-bottom: 18px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            overflow-x: auto;
         }
 
         .tab {
-            padding: 10px 20px;
-            border-radius: 10px;
+            padding: 10px 16px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            color: var(--muted);
+            background: rgba(255, 255, 255, 0.03);
             cursor: pointer;
-            font-weight: 500;
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            color: var(--text-muted);
-            transition: all 0.2s ease;
+            white-space: nowrap;
+            font-weight: 650;
         }
 
         .tab.active {
             background: var(--primary);
             color: white;
             border-color: transparent;
-            box-shadow: 0 4px 12px var(--primary-glow);
         }
 
         .tab-content {
@@ -380,21 +137,204 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
             display: block;
         }
 
-        /* Log console */
-        .console {
-            background: #040810;
-            border: 1px solid var(--card-border);
-            border-radius: 12px;
-            font-family: 'Courier New', Courier, monospace;
-            padding: 15px;
-            height: 150px;
-            overflow-y: auto;
-            color: #34d399;
-            font-size: 0.85rem;
-            line-height: 1.4;
+        .dashboard-grid,
+        .settings-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 18px;
+        }
+
+        .card {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 18px;
             display: flex;
             flex-direction: column;
-            gap: 4px;
+            gap: 14px;
+            backdrop-filter: blur(14px);
+        }
+
+        .wide-card {
+            grid-column: 1 / -1;
+        }
+
+        .card-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .subtitle {
+            color: var(--muted);
+            font-size: 0.82rem;
+            margin-top: 4px;
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .stat-box {
+            background: var(--panel-2);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 8px;
+            padding: 10px;
+            min-width: 0;
+        }
+
+        .stat-label {
+            display: block;
+            color: var(--muted);
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+
+        .stat-value {
+            font-size: 1.08rem;
+            font-weight: 750;
+            overflow-wrap: anywhere;
+        }
+
+        .stat-unit {
+            color: var(--muted);
+            font-size: 0.78rem;
+            margin-left: 4px;
+            font-weight: 500;
+        }
+
+        .badge {
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 0.72rem;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        .badge-disabled { background: rgba(156, 163, 175, 0.16); color: #d1d5db; }
+        .badge-idle { background: rgba(59, 130, 246, 0.16); color: #93c5fd; }
+        .badge-moving { background: rgba(16, 185, 129, 0.16); color: #6ee7b7; }
+        .badge-homing { background: rgba(245, 158, 11, 0.16); color: #fcd34d; }
+        .badge-error { background: rgba(239, 68, 68, 0.16); color: #fca5a5; }
+
+        .progress-container {
+            height: 10px;
+            overflow: hidden;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .progress-bar {
+            height: 100%;
+            width: 0%;
+            border-radius: 999px;
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+            transition: width 0.25s ease;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        label {
+            color: var(--muted);
+            font-size: 0.8rem;
+            font-weight: 650;
+        }
+
+        input,
+        select {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 10px 11px;
+            outline: none;
+            font-size: 0.93rem;
+        }
+
+        input:focus,
+        select:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+        }
+
+        .input-with-btn,
+        .button-row,
+        .motor-controls {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 9px;
+        }
+
+        .jog-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 9px;
+        }
+
+        .relay-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 14px;
+        }
+
+        .btn,
+        .emergency-btn {
+            min-height: 40px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 8px;
+            color: white;
+            background: rgba(255, 255, 255, 0.08);
+            cursor: pointer;
+            font-weight: 800;
+            font-size: 0.88rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 9px 12px;
+        }
+
+        .btn:hover,
+        .emergency-btn:hover {
+            filter: brightness(1.12);
+        }
+
+        .btn-primary { background: #2563eb; border-color: transparent; }
+        .btn-success { background: #059669; border-color: transparent; }
+        .btn-warning { background: #d97706; border-color: transparent; }
+        .btn-danger,
+        .emergency-btn { background: #dc2626; border-color: transparent; }
+
+        .state-row {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 8px;
+            color: var(--muted);
+            font-size: 0.82rem;
+        }
+
+        .console {
+            height: 160px;
+            overflow: auto;
+            background: #050914;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px;
+            font-family: Consolas, monospace;
+            font-size: 0.82rem;
+            line-height: 1.45;
+            color: #86efac;
         }
 
         .console-entry {
@@ -403,326 +343,283 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
         }
 
         .console-time {
-            color: #60a5fa;
-            flex-shrink: 0;
-        }
-
-        .console-text {
-            word-break: break-all;
+            color: #93c5fd;
+            flex: 0 0 auto;
         }
 
         .console-warn { color: var(--warning); }
-        .console-err { color: var(--danger); }
-
-        .settings-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 20px;
-        }
+        .console-err { color: #fca5a5; }
 
         footer {
+            padding: 24px 0 4px;
             text-align: center;
-            padding: 30px 0 10px 0;
-            font-size: 0.8rem;
-            color: var(--text-muted);
+            color: var(--muted);
+            font-size: 0.78rem;
         }
 
-        .unit-selector {
-            width: 100%;
-        }
-
-        .jog-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 8px;
-        }
-
-        .wdt-status {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 0.85rem;
-        }
-
-        @media (max-width: 768px) {
-            body {
-                padding: 10px;
-            }
-            .dashboard-grid {
+        @media (max-width: 720px) {
+            body { padding: 12px; }
+            header { align-items: stretch; }
+            .header-actions,
+            .button-row,
+            .motor-controls,
+            .input-with-btn {
                 grid-template-columns: 1fr;
+                display: grid;
+                width: 100%;
             }
-            .stat-grid {
-                grid-template-columns: 1fr 1fr;
-            }
-            header {
-                flex-direction: column;
-                align-items: stretch;
-            }
-            .logo-area {
-                text-align: center;
-                display: flex;
-                justify-content: center;
-            }
-            .header-actions {
-                display: flex;
-                flex-direction: column;
-                gap: 10px;
+            .stat-grid,
+            .state-row {
+                grid-template-columns: 1fr;
             }
         }
     </style>
 </head>
 <body>
-
     <header>
-        <div class="logo-area">
-            <h1>🌀 Dual Axis Motion Control</h1>
+        <div>
+            <h1>ESP32 Dual Axis Motion Control</h1>
+            <div class="subtitle">Two stepper motors, homing switches, timed relay outputs, and live telemetry.</div>
         </div>
         <div class="header-actions">
             <span class="status-badge">
                 <span id="ws-status-dot" class="status-dot"></span>
-                <span id="ws-status-text">WebSocket: Bağlantı Yok</span>
+                <span id="ws-status-text">WebSocket: disconnected</span>
             </span>
-            <button class="emergency-btn" onclick="sendAllStop()">ALL STOP (ACİL DUR)</button>
+            <button class="emergency-btn" onclick="sendAllStop()">All Stop</button>
         </div>
     </header>
 
-    <div class="tabs">
-        <div class="tab active" onclick="switchTab('dashboard')">Gösterge Paneli</div>
-        <div class="tab" onclick="switchTab('settings')">Motor Ayarları</div>
-        <div class="tab" onclick="switchTab('wifi-tab')">WiFi Ayarları</div>
-    </div>
+    <nav class="tabs">
+        <button class="tab active" onclick="switchTab(event, 'dashboard')">Dashboard</button>
+        <button class="tab" onclick="switchTab(event, 'settings')">Motor Settings</button>
+        <button class="tab" onclick="switchTab(event, 'wifi-tab')">Wi-Fi Settings</button>
+    </nav>
 
-    <!-- TAB: DASHBOARD -->
-    <div id="tab-dashboard" class="tab-content active">
+    <section id="tab-dashboard" class="tab-content active">
         <div class="dashboard-grid">
-            
-            <!-- MOTOR 1 -->
-            <div class="card">
+            <article class="card">
                 <div class="card-title">
                     <div>
-                        <h2>X Ekseni (Motor 1)</h2>
-                        <span class="card-subtitle">GPIO25/26 - Lead Screw / Belt</span>
+                        <h2>X Axis - Motor 1</h2>
+                        <div class="subtitle">STEP GPIO25, DIR GPIO26, ENABLE GPIO27, HOME GPIO32</div>
                     </div>
-                    <span id="m1-status-badge" class="badge badge-disabled">Pasif</span>
+                    <span id="m1-status-badge" class="badge badge-disabled">Disabled</span>
                 </div>
 
                 <div class="stat-grid">
                     <div class="stat-box">
-                        <span class="stat-label">Anlık Pozisyon</span>
+                        <span class="stat-label">Current Position</span>
                         <span class="stat-value"><span id="m1-pos-val">0.00</span><span id="m1-pos-unit" class="stat-unit">mm</span></span>
-                        <span class="stat-label" style="font-size: 0.65rem;">Pulse: <span id="m1-pos-pulse">0</span></span>
+                        <span class="stat-label">Pulse: <span id="m1-pos-pulse">0</span></span>
                     </div>
                     <div class="stat-box">
-                        <span class="stat-label">Hedef Pozisyon</span>
+                        <span class="stat-label">Target Position</span>
                         <span class="stat-value"><span id="m1-target-val">0.00</span><span id="m1-target-unit" class="stat-unit">mm</span></span>
-                        <span class="stat-label" style="font-size: 0.65rem;">Pulse: <span id="m1-target-pulse">0</span></span>
+                        <span class="stat-label">Pulse: <span id="m1-target-pulse">0</span></span>
                     </div>
                     <div class="stat-box">
-                        <span class="stat-label">Kalan Mesafe</span>
+                        <span class="stat-label">Remaining Distance</span>
                         <span class="stat-value"><span id="m1-dist-val">0.00</span><span id="m1-dist-unit" class="stat-unit">mm</span></span>
                     </div>
                     <div class="stat-box">
-                        <span class="stat-label">Hız / İvme</span>
-                        <span class="stat-value" style="font-size: 0.95rem; line-height: 1.2;">
-                            Hız: <span id="m1-speed">0</span> Hz<br>
-                            İvme: <span id="m1-accel">0</span> Hz/s²
-                        </span>
+                        <span class="stat-label">Speed / Acceleration</span>
+                        <span class="stat-value" style="font-size:0.94rem">Speed: <span id="m1-speed">0</span> Hz<br>Accel: <span id="m1-accel">0</span> Hz/s2</span>
                     </div>
                 </div>
 
-                <!-- Progress percentage -->
-                <div style="display:flex; justify-content:space-between; font-size:0.8rem; color:var(--text-muted);">
-                    <span>İlerleme</span>
+                <div style="display:flex;justify-content:space-between;color:var(--muted);font-size:0.82rem">
+                    <span>Progress</span>
                     <span id="m1-progress-pct">100%</span>
                 </div>
-                <div class="progress-container">
-                    <div id="m1-progress-bar" class="progress-bar"></div>
-                </div>
+                <div class="progress-container"><div id="m1-progress-bar" class="progress-bar"></div></div>
 
-                <div style="display: flex; justify-content: space-between; font-size: 0.85rem; background: rgba(255,255,255,0.02); padding: 8px; border-radius: 8px;">
+                <div class="state-row">
                     <div>Home Switch: <span id="m1-sw" class="indicator"></span></div>
-                    <div>Sürücü Yetkisi: <span id="m1-en" class="indicator"></span></div>
-                    <div>Home Durumu: <span id="m1-home-ok" style="font-weight:600; color:var(--danger)">Bulunmadı</span></div>
+                    <div>Driver Enable: <span id="m1-en" class="indicator"></span></div>
+                    <div>Home: <span id="m1-home-ok" style="font-weight:800;color:var(--danger)">Not Set</span></div>
                 </div>
 
                 <div class="input-group">
-                    <label>Hedef Pozisyon Git</label>
+                    <label for="m1-goto-input">Move To Position</label>
                     <div class="input-with-btn">
-                        <input type="number" id="m1-goto-input" step="0.01" placeholder="Miktar...">
-                        <button class="btn btn-primary" onclick="moveMotor(1)">GİT</button>
+                        <input type="number" id="m1-goto-input" step="0.01" placeholder="Position">
+                        <button class="btn btn-primary" onclick="moveMotor(1)">Go</button>
                     </div>
                 </div>
 
                 <div class="jog-grid">
                     <button class="btn btn-warning" onclick="jogMotor(1, -10)">-10</button>
-                    <button class="btn" style="color:var(--danger); border-color:var(--danger-glow)" onclick="stopMotor(1)">DUR</button>
+                    <button class="btn btn-danger" onclick="stopMotor(1)">Stop</button>
                     <button class="btn btn-success" onclick="jogMotor(1, 10)">+10</button>
                 </div>
 
                 <div class="motor-controls">
-                    <button class="btn btn-primary" onclick="homeMotor(1)">🚀 HOME YAP</button>
-                    <button class="btn" onclick="resetMotorPos(1)">📍 0 NOKTASI YAP</button>
+                    <button class="btn btn-primary" onclick="homeMotor(1)">Home</button>
+                    <button class="btn" onclick="resetMotorPos(1)">Set Zero</button>
                 </div>
 
                 <div class="motor-controls">
-                    <button class="btn btn-success" onclick="enableMotor(1, true)">Güç Ver (EN)</button>
-                    <button class="btn btn-danger" onclick="enableMotor(1, false)">Gücü Kes (DIS)</button>
+                    <button class="btn btn-success" onclick="enableMotor(1, true)">Enable Driver</button>
+                    <button class="btn btn-danger" onclick="enableMotor(1, false)">Disable Driver</button>
                 </div>
-            </div>
+            </article>
 
-            <!-- MOTOR 2 -->
-            <div class="card">
+            <article class="card">
                 <div class="card-title">
                     <div>
-                        <h2>Y Ekseni (Motor 2)</h2>
-                        <span class="card-subtitle">GPIO18/19 - Lead Screw / Belt</span>
+                        <h2>Y Axis - Motor 2</h2>
+                        <div class="subtitle">STEP GPIO18, DIR GPIO19, ENABLE GPIO21, HOME GPIO33</div>
                     </div>
-                    <span id="m2-status-badge" class="badge badge-disabled">Pasif</span>
+                    <span id="m2-status-badge" class="badge badge-disabled">Disabled</span>
                 </div>
 
                 <div class="stat-grid">
                     <div class="stat-box">
-                        <span class="stat-label">Anlık Pozisyon</span>
+                        <span class="stat-label">Current Position</span>
                         <span class="stat-value"><span id="m2-pos-val">0.00</span><span id="m2-pos-unit" class="stat-unit">mm</span></span>
-                        <span class="stat-label" style="font-size: 0.65rem;">Pulse: <span id="m2-pos-pulse">0</span></span>
+                        <span class="stat-label">Pulse: <span id="m2-pos-pulse">0</span></span>
                     </div>
                     <div class="stat-box">
-                        <span class="stat-label">Hedef Pozisyon</span>
+                        <span class="stat-label">Target Position</span>
                         <span class="stat-value"><span id="m2-target-val">0.00</span><span id="m2-target-unit" class="stat-unit">mm</span></span>
-                        <span class="stat-label" style="font-size: 0.65rem;">Pulse: <span id="m2-target-pulse">0</span></span>
+                        <span class="stat-label">Pulse: <span id="m2-target-pulse">0</span></span>
                     </div>
                     <div class="stat-box">
-                        <span class="stat-label">Kalan Mesafe</span>
+                        <span class="stat-label">Remaining Distance</span>
                         <span class="stat-value"><span id="m2-dist-val">0.00</span><span id="m2-dist-unit" class="stat-unit">mm</span></span>
                     </div>
                     <div class="stat-box">
-                        <span class="stat-label">Hız / İvme</span>
-                        <span class="stat-value" style="font-size: 0.95rem; line-height: 1.2;">
-                            Hız: <span id="m2-speed">0</span> Hz<br>
-                            İvme: <span id="m2-accel">0</span> Hz/s²
-                        </span>
+                        <span class="stat-label">Speed / Acceleration</span>
+                        <span class="stat-value" style="font-size:0.94rem">Speed: <span id="m2-speed">0</span> Hz<br>Accel: <span id="m2-accel">0</span> Hz/s2</span>
                     </div>
                 </div>
 
-                <!-- Progress percentage -->
-                <div style="display:flex; justify-content:space-between; font-size:0.8rem; color:var(--text-muted);">
-                    <span>İlerleme</span>
+                <div style="display:flex;justify-content:space-between;color:var(--muted);font-size:0.82rem">
+                    <span>Progress</span>
                     <span id="m2-progress-pct">100%</span>
                 </div>
-                <div class="progress-container">
-                    <div id="m2-progress-bar" class="progress-bar"></div>
-                </div>
+                <div class="progress-container"><div id="m2-progress-bar" class="progress-bar"></div></div>
 
-                <div style="display: flex; justify-content: space-between; font-size: 0.85rem; background: rgba(255,255,255,0.02); padding: 8px; border-radius: 8px;">
+                <div class="state-row">
                     <div>Home Switch: <span id="m2-sw" class="indicator"></span></div>
-                    <div>Sürücü Yetkisi: <span id="m2-en" class="indicator"></span></div>
-                    <div>Home Durumu: <span id="m2-home-ok" style="font-weight:600; color:var(--danger)">Bulunmadı</span></div>
+                    <div>Driver Enable: <span id="m2-en" class="indicator"></span></div>
+                    <div>Home: <span id="m2-home-ok" style="font-weight:800;color:var(--danger)">Not Set</span></div>
                 </div>
 
                 <div class="input-group">
-                    <label>Hedef Pozisyon Git</label>
+                    <label for="m2-goto-input">Move To Position</label>
                     <div class="input-with-btn">
-                        <input type="number" id="m2-goto-input" step="0.01" placeholder="Miktar...">
-                        <button class="btn btn-primary" onclick="moveMotor(2)">GİT</button>
+                        <input type="number" id="m2-goto-input" step="0.01" placeholder="Position">
+                        <button class="btn btn-primary" onclick="moveMotor(2)">Go</button>
                     </div>
                 </div>
 
                 <div class="jog-grid">
                     <button class="btn btn-warning" onclick="jogMotor(2, -10)">-10</button>
-                    <button class="btn" style="color:var(--danger); border-color:var(--danger-glow)" onclick="stopMotor(2)">DUR</button>
+                    <button class="btn btn-danger" onclick="stopMotor(2)">Stop</button>
                     <button class="btn btn-success" onclick="jogMotor(2, 10)">+10</button>
                 </div>
 
                 <div class="motor-controls">
-                    <button class="btn btn-primary" onclick="homeMotor(2)">🚀 HOME YAP</button>
-                    <button class="btn" onclick="resetMotorPos(2)">📍 0 NOKTASI YAP</button>
+                    <button class="btn btn-primary" onclick="homeMotor(2)">Home</button>
+                    <button class="btn" onclick="resetMotorPos(2)">Set Zero</button>
                 </div>
 
                 <div class="motor-controls">
-                    <button class="btn btn-success" onclick="enableMotor(2, true)">Güç Ver (EN)</button>
-                    <button class="btn btn-danger" onclick="enableMotor(2, false)">Gücü Kes (DIS)</button>
+                    <button class="btn btn-success" onclick="enableMotor(2, true)">Enable Driver</button>
+                    <button class="btn btn-danger" onclick="enableMotor(2, false)">Disable Driver</button>
                 </div>
-            </div>
+            </article>
 
-            <!-- TELEMETRY & CONSOLE -->
-            <div class="card">
+            <article class="card wide-card">
                 <div class="card-title">
-                    <h2>Sistem Bilgileri</h2>
-                    <span class="wdt-status">WDT: <b id="sys-wdt" style="color:var(--success)">AKTİF</b></span>
+                    <div>
+                        <h2>Timed Relay Outputs</h2>
+                        <div class="subtitle">Relay 1 uses GPIO23. Relay 2 uses GPIO5. The output turns off automatically when the timer expires.</div>
+                    </div>
+                </div>
+                <div class="relay-grid">
+                    <div class="stat-box">
+                        <div class="card-title" style="border:0;padding:0;margin-bottom:8px">
+                            <h3>Relay 1</h3>
+                            <span class="status-badge"><span id="r1-ind" class="indicator"></span><span id="r1-state">Off</span></span>
+                        </div>
+                        <div class="stat-grid">
+                            <div class="input-group">
+                                <label for="r1-duration">On Time (seconds)</label>
+                                <input type="number" id="r1-duration" min="1" max="86400" value="5">
+                            </div>
+                            <div class="stat-box">
+                                <span class="stat-label">Remaining</span>
+                                <span class="stat-value"><span id="r1-remaining">0</span><span class="stat-unit">s</span></span>
+                            </div>
+                        </div>
+                        <div class="button-row" style="margin-top:10px">
+                            <button class="btn btn-success" onclick="triggerRelay(1)">Trigger Relay 1</button>
+                            <button class="btn btn-danger" onclick="turnRelayOff(1)">Turn Off</button>
+                        </div>
+                    </div>
+
+                    <div class="stat-box">
+                        <div class="card-title" style="border:0;padding:0;margin-bottom:8px">
+                            <h3>Relay 2</h3>
+                            <span class="status-badge"><span id="r2-ind" class="indicator"></span><span id="r2-state">Off</span></span>
+                        </div>
+                        <div class="stat-grid">
+                            <div class="input-group">
+                                <label for="r2-duration">On Time (seconds)</label>
+                                <input type="number" id="r2-duration" min="1" max="86400" value="5">
+                            </div>
+                            <div class="stat-box">
+                                <span class="stat-label">Remaining</span>
+                                <span class="stat-value"><span id="r2-remaining">0</span><span class="stat-unit">s</span></span>
+                            </div>
+                        </div>
+                        <div class="button-row" style="margin-top:10px">
+                            <button class="btn btn-success" onclick="triggerRelay(2)">Trigger Relay 2</button>
+                            <button class="btn btn-danger" onclick="turnRelayOff(2)">Turn Off</button>
+                        </div>
+                    </div>
+                </div>
+            </article>
+
+            <article class="card wide-card">
+                <div class="card-title">
+                    <h2>System Information</h2>
+                    <span class="status-badge">WDT: <b id="sys-wdt" style="color:var(--success)">Active</b></span>
                 </div>
                 <div class="stat-grid">
-                    <div class="stat-box">
-                        <span class="stat-label">Bağlantı Türü</span>
-                        <span class="stat-value" id="sys-wifi-mode" style="font-size:1.1rem">-</span>
-                    </div>
-                    <div class="stat-box">
-                        <span class="stat-label">Sistem IP Adresi</span>
-                        <span class="stat-value" id="sys-wifi-ip" style="font-size:1.1rem">-</span>
-                    </div>
-                    <div class="stat-box">
-                        <span class="stat-label">Uptime (Çalışma)</span>
-                        <span class="stat-value" id="sys-uptime" style="font-size:1.1rem">0 s</span>
-                    </div>
-                    <div class="stat-box">
-                        <span class="stat-label">Boş Heap (RAM)</span>
-                        <span class="stat-value" id="sys-heap" style="font-size:1.1rem">0 KB</span>
-                    </div>
+                    <div class="stat-box"><span class="stat-label">Connection Mode</span><span class="stat-value" id="sys-wifi-mode">-</span></div>
+                    <div class="stat-box"><span class="stat-label">System IP Address</span><span class="stat-value" id="sys-wifi-ip">-</span></div>
+                    <div class="stat-box"><span class="stat-label">Uptime</span><span class="stat-value" id="sys-uptime">00:00:00</span></div>
+                    <div class="stat-box"><span class="stat-label">Free Heap</span><span class="stat-value" id="sys-heap">0 KB</span></div>
                 </div>
-
-                <div class="card-title" style="border:none; padding: 0; margin-top:10px;">
-                    <h2>Sistem Günlüğü (Log)</h2>
-                </div>
+                <h2>System Log</h2>
                 <div class="console" id="sys-console">
-                    <div class="console-entry">
-                        <span class="console-time">[00:00:00]</span>
-                        <span class="console-text">Arayüz başlatıldı. WebSocket bağlantısı bekleniyor...</span>
-                    </div>
+                    <div class="console-entry"><span class="console-time">[00:00:00]</span><span>Interface started. Waiting for WebSocket connection...</span></div>
                 </div>
-                <button class="btn" onclick="document.getElementById('sys-console').innerHTML=''">Günlüğü Temizle</button>
-            </div>
-
+                <button class="btn" onclick="document.getElementById('sys-console').innerHTML=''">Clear Log</button>
+            </article>
         </div>
-    </div>
+    </section>
 
-    <!-- TAB: SETTINGS -->
-    <div id="tab-settings" class="tab-content">
-        <div class="card">
-            <div class="card-title">
-                <h2>Motor Mekanik ve Limit Konfigürasyonları</h2>
-            </div>
-            
+    <section id="tab-settings" class="tab-content">
+        <article class="card">
+            <div class="card-title"><h2>Motor Mechanical And Limit Configuration</h2></div>
             <div class="settings-grid">
-                <!-- MOTOR 1 SETTINGS -->
-                <div style="display:flex; flex-direction:column; gap:12px; border-right: 1px solid rgba(255,255,255,0.05); padding-right:20px;">
-                    <h3>Motor 1 (X Ekseni)</h3>
-                    
+                <div style="display:flex;flex-direction:column;gap:12px">
+                    <h3>Motor 1 - X Axis</h3>
                     <div class="stat-grid">
-                        <div class="input-group">
-                            <label>Hız Limiti (Step/s)</label>
-                            <input type="number" id="m1-cfg-speed" value="2000">
-                        </div>
-                        <div class="input-group">
-                            <label>İvme (Step/s²)</label>
-                            <input type="number" id="m1-cfg-accel" value="1000">
-                        </div>
+                        <div class="input-group"><label>Speed Limit (steps/s)</label><input type="number" id="m1-cfg-speed" value="2000"></div>
+                        <div class="input-group"><label>Acceleration (steps/s2)</label><input type="number" id="m1-cfg-accel" value="1000"></div>
                     </div>
-
                     <div class="stat-grid">
-                        <div class="input-group">
-                            <label>Yazılımsal Min Sınır (Step)</label>
-                            <input type="number" id="m1-cfg-min" value="0">
-                        </div>
-                        <div class="input-group">
-                            <label>Yazılımsal Max Sınır (Step)</label>
-                            <input type="number" id="m1-cfg-max" value="50000">
-                        </div>
+                        <div class="input-group"><label>Software Minimum Limit (steps)</label><input type="number" id="m1-cfg-min" value="0"></div>
+                        <div class="input-group"><label>Software Maximum Limit (steps)</label><input type="number" id="m1-cfg-max" value="50000"></div>
                     </div>
-
                     <div class="stat-grid">
-                        <div class="input-group">
-                            <label>Adım Açısı (Derece)</label>
-                            <input type="number" id="m1-cfg-angle" step="0.1" value="1.8">
-                        </div>
+                        <div class="input-group"><label>Step Angle (degrees)</label><input type="number" id="m1-cfg-angle" step="0.1" value="1.8"></div>
                         <div class="input-group">
                             <label>Microstep (1/x)</label>
                             <select id="m1-cfg-usteps">
@@ -735,73 +632,41 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
                             </select>
                         </div>
                     </div>
-
                     <div class="input-group">
-                        <label>Tahrik Sistemi</label>
+                        <label>Drive System</label>
                         <select id="m1-cfg-drive" onchange="toggleDriveInputs(1)">
-                            <option value="0" selected>Vidalı Mil (Lead Screw)</option>
-                            <option value="1">Kayış & Kasnak (Belt & Pulley)</option>
+                            <option value="0" selected>Lead Screw</option>
+                            <option value="1">Belt And Pulley</option>
                         </select>
                     </div>
-
-                    <div id="m1-drive-screw" class="input-group">
-                        <label>Vida Hatvesi (mm/Tur)</label>
-                        <input type="number" id="m1-cfg-pitch" step="0.01" value="8.00">
+                    <div id="m1-drive-screw" class="input-group"><label>Lead Screw Pitch (mm/rev)</label><input type="number" id="m1-cfg-pitch" step="0.01" value="8.00"></div>
+                    <div id="m1-drive-belt" class="stat-grid" style="display:none">
+                        <div class="input-group"><label>Belt Pitch (mm)</label><input type="number" id="m1-cfg-beltpitch" step="0.01" value="2.00"></div>
+                        <div class="input-group"><label>Pulley Teeth</label><input type="number" id="m1-cfg-teeth" value="20"></div>
                     </div>
-
-                    <div id="m1-drive-belt" class="stat-grid" style="display:none;">
-                        <div class="input-group">
-                            <label>Diş Hatvesi (mm)</label>
-                            <input type="number" id="m1-cfg-beltpitch" step="0.01" value="2.00">
-                        </div>
-                        <div class="input-group">
-                            <label>Diş Sayısı (T)</label>
-                            <input type="number" id="m1-cfg-teeth" value="20">
-                        </div>
-                    </div>
-
                     <div class="input-group">
-                        <label>Arayüz Birimi</label>
-                        <select id="m1-cfg-unit" class="unit-selector">
-                            <option value="0">Pulse (Step Adedi)</option>
-                            <option value="1" selected>Milimetre (mm)</option>
-                            <option value="2">Santimetre (cm)</option>
-                            <option value="3">Derece (Degree)</option>
+                        <label>Interface Unit</label>
+                        <select id="m1-cfg-unit">
+                            <option value="0">Pulse</option>
+                            <option value="1" selected>Millimeter (mm)</option>
+                            <option value="2">Centimeter (cm)</option>
+                            <option value="3">Degree</option>
                         </select>
                     </div>
                 </div>
 
-                <!-- MOTOR 2 SETTINGS -->
-                <div style="display:flex; flex-direction:column; gap:12px;">
-                    <h3>Motor 2 (Y Ekseni)</h3>
-                    
+                <div style="display:flex;flex-direction:column;gap:12px">
+                    <h3>Motor 2 - Y Axis</h3>
                     <div class="stat-grid">
-                        <div class="input-group">
-                            <label>Hız Limiti (Step/s)</label>
-                            <input type="number" id="m2-cfg-speed" value="2000">
-                        </div>
-                        <div class="input-group">
-                            <label>İvme (Step/s²)</label>
-                            <input type="number" id="m2-cfg-accel" value="1000">
-                        </div>
+                        <div class="input-group"><label>Speed Limit (steps/s)</label><input type="number" id="m2-cfg-speed" value="2000"></div>
+                        <div class="input-group"><label>Acceleration (steps/s2)</label><input type="number" id="m2-cfg-accel" value="1000"></div>
                     </div>
-
                     <div class="stat-grid">
-                        <div class="input-group">
-                            <label>Yazılımsal Min Sınır (Step)</label>
-                            <input type="number" id="m2-cfg-min" value="0">
-                        </div>
-                        <div class="input-group">
-                            <label>Yazılımsal Max Sınır (Step)</label>
-                            <input type="number" id="m2-cfg-max" value="100000">
-                        </div>
+                        <div class="input-group"><label>Software Minimum Limit (steps)</label><input type="number" id="m2-cfg-min" value="0"></div>
+                        <div class="input-group"><label>Software Maximum Limit (steps)</label><input type="number" id="m2-cfg-max" value="100000"></div>
                     </div>
-
                     <div class="stat-grid">
-                        <div class="input-group">
-                            <label>Adım Açısı (Derece)</label>
-                            <input type="number" id="m2-cfg-angle" step="0.1" value="1.8">
-                        </div>
+                        <div class="input-group"><label>Step Angle (degrees)</label><input type="number" id="m2-cfg-angle" step="0.1" value="1.8"></div>
                         <div class="input-group">
                             <label>Microstep (1/x)</label>
                             <select id="m2-cfg-usteps">
@@ -814,341 +679,241 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
                             </select>
                         </div>
                     </div>
-
                     <div class="input-group">
-                        <label>Tahrik Sistemi</label>
+                        <label>Drive System</label>
                         <select id="m2-cfg-drive" onchange="toggleDriveInputs(2)">
-                            <option value="0" selected>Vidalı Mil (Lead Screw)</option>
-                            <option value="1">Kayış & Kasnak (Belt & Pulley)</option>
+                            <option value="0" selected>Lead Screw</option>
+                            <option value="1">Belt And Pulley</option>
                         </select>
                     </div>
-
-                    <div id="m2-drive-screw" class="input-group">
-                        <label>Vida Hatvesi (mm/Tur)</label>
-                        <input type="number" id="m2-cfg-pitch" step="0.01" value="8.00">
+                    <div id="m2-drive-screw" class="input-group"><label>Lead Screw Pitch (mm/rev)</label><input type="number" id="m2-cfg-pitch" step="0.01" value="8.00"></div>
+                    <div id="m2-drive-belt" class="stat-grid" style="display:none">
+                        <div class="input-group"><label>Belt Pitch (mm)</label><input type="number" id="m2-cfg-beltpitch" step="0.01" value="2.00"></div>
+                        <div class="input-group"><label>Pulley Teeth</label><input type="number" id="m2-cfg-teeth" value="20"></div>
                     </div>
-
-                    <div id="m2-drive-belt" class="stat-grid" style="display:none;">
-                        <div class="input-group">
-                            <label>Diş Hatvesi (mm)</label>
-                            <input type="number" id="m2-cfg-beltpitch" step="0.01" value="2.00">
-                        </div>
-                        <div class="input-group">
-                            <label>Diş Sayısı (T)</label>
-                            <input type="number" id="m2-cfg-teeth" value="20">
-                        </div>
-                    </div>
-
                     <div class="input-group">
-                        <label>Arayüz Birimi</label>
-                        <select id="m2-cfg-unit" class="unit-selector">
-                            <option value="0">Pulse (Step Adedi)</option>
-                            <option value="1" selected>Milimetre (mm)</option>
-                            <option value="2">Santimetre (cm)</option>
-                            <option value="3">Derece (Degree)</option>
+                        <label>Interface Unit</label>
+                        <select id="m2-cfg-unit">
+                            <option value="0">Pulse</option>
+                            <option value="1" selected>Millimeter (mm)</option>
+                            <option value="2">Centimeter (cm)</option>
+                            <option value="3">Degree</option>
                         </select>
                     </div>
                 </div>
             </div>
 
-            <div style="border-top: 1px solid rgba(255,255,255,0.05); padding-top:15px; display:flex; flex-direction:column; gap:12px;">
-                <h3>Sürücü Güç Yönetimi (Auto-Enable Timeout)</h3>
-                <div class="stat-grid">
+            <div class="stat-box">
+                <h3>Driver Power Management</h3>
+                <div class="stat-grid" style="margin-top:10px">
                     <div class="input-group">
-                        <label>Timeout Özelliği</label>
+                        <label>Auto-Disable Feature</label>
                         <select id="sys-cfg-timeout-active">
-                            <option value="1" selected>Aktif (10sn sonra enerjiyi kes)</option>
-                            <option value="0">Pasif (Motor sürekli enerjili kalsın)</option>
+                            <option value="1" selected>Enabled</option>
+                            <option value="0">Disabled</option>
                         </select>
                     </div>
-                    <div class="input-group">
-                        <label>Timeout Süresi (Saniye)</label>
-                        <input type="number" id="sys-cfg-timeout-duration" value="10" min="1">
-                    </div>
+                    <div class="input-group"><label>Timeout Duration (seconds)</label><input type="number" id="sys-cfg-timeout-duration" value="10" min="1"></div>
                 </div>
             </div>
-
-            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
-                <button class="btn btn-primary" style="padding:12px 24px;" onclick="saveMotorSettings()">AYARLARI KAYDET VE UYGULA</button>
+            <div style="display:flex;justify-content:flex-end">
+                <button class="btn btn-primary" onclick="saveMotorSettings()">Save And Apply Settings</button>
             </div>
-        </div>
-    </div>
+        </article>
+    </section>
 
-    <!-- TAB: WIFI -->
-    <div id="tab-wifi-tab" class="tab-content">
-        <div class="card">
-            <div class="card-title">
-                <h2>Wi-Fi Bağlantı Ayarları</h2>
+    <section id="tab-wifi-tab" class="tab-content">
+        <article class="card" style="max-width:620px;margin:0 auto">
+            <div class="card-title"><h2>Wi-Fi Connection Settings</h2></div>
+            <div class="stat-box">
+                <h3>Access Point And Station Mode</h3>
+                <p class="subtitle">The ESP32 always starts its own access point with SSID ESP32-MOTOR and password 12345678. If station credentials are saved, it also tries to join that local network after boot.</p>
             </div>
-            
-            <div style="display:flex; flex-direction:column; gap:15px; max-width:500px; margin:0 auto; width:100%;">
-                <div class="stat-box" style="background:rgba(59,130,246,0.05); border-color:var(--primary-glow); padding:15px; margin-bottom:10px;">
-                    <h3 style="color:#60a5fa; margin-bottom:5px;">Bilgilendirme</h3>
-                    <p style="font-size:0.85rem; line-height:1.4; color:var(--text-muted)">
-                        ESP32 varsayılan olarak hem kendi yayını yapar (<b>SSID: ESP32-MOTOR</b>, Şifre: <b>12345678</b>) hem de buraya girdiğiniz Wi-Fi ağına bağlanmaya çalışır. 
-                        Bağlantı başarılı olduğunda, yerel ağınızdaki IP adresi ile sisteme ulaşabilirsiniz.
-                    </p>
-                </div>
-
-                <div class="input-group">
-                    <label>Kablosuz Ağ Adı (SSID)</label>
-                    <input type="text" id="wifi-ssid" placeholder="Modeminizin SSID adı...">
-                </div>
-
-                <div class="input-group">
-                    <label>Ağ Şifresi (SSID Password)</label>
-                    <input type="password" id="wifi-pass" placeholder="Ağ şifreniz...">
-                </div>
-
-                <div style="display:flex; justify-content:space-between; gap:10px; margin-top:10px;">
-                    <button class="btn btn-danger" onclick="rebootESP()">CİHAZI YENİDEN BAŞLAT</button>
-                    <button class="btn btn-primary" onclick="saveWifiSettings()">KAYDET VE BAĞLAN</button>
-                </div>
+            <div class="input-group"><label for="wifi-ssid">Wireless Network Name (SSID)</label><input type="text" id="wifi-ssid" placeholder="Network SSID"></div>
+            <div class="input-group"><label for="wifi-pass">Wireless Password</label><input type="password" id="wifi-pass" placeholder="Network password"></div>
+            <div class="button-row">
+                <button class="btn btn-danger" onclick="rebootESP()">Restart Device</button>
+                <button class="btn btn-primary" onclick="saveWifiSettings()">Save Wi-Fi</button>
             </div>
-        </div>
-    </div>
+        </article>
+    </section>
 
-    <footer>
-        <p>ESP32 Motion Controller System © 2026. Made with ❤️ for Industrial Automation.</p>
-    </footer>
+    <footer>ESP32 Motion Controller System - 2026</footer>
 
     <script>
         let ws;
-        let wsReconnectInterval = 2000;
-        let activeTab = 'dashboard';
-        
-        // Track original targets & start positions for progress calculation
-        let m1StartPos = 0, m1TargetPos = 0;
-        let m2StartPos = 0, m2TargetPos = 0;
+        const wsReconnectInterval = 2000;
+        let activeTab = "dashboard";
 
         function initWebSocket() {
             const host = window.location.hostname || "192.168.4.1";
-            const wsUri = "ws://" + host + "/ws";
-            
-            console.log("WebSocket connecting to " + wsUri);
-            ws = new WebSocket(wsUri);
+            ws = new WebSocket("ws://" + host + "/ws");
 
             ws.onopen = function() {
-                console.log("WebSocket connected.");
-                updateWsStatus(true, "WebSocket Bağlandı");
-                logConsole("WebSocket bağlantısı sağlandı.");
+                updateWsStatus(true, "WebSocket: connected");
+                logConsole("WebSocket connection established.");
             };
 
             ws.onclose = function() {
-                console.log("WebSocket disconnected.");
-                updateWsStatus(false, "WebSocket Bağlantı Koptu");
-                logConsole("WebSocket bağlantısı koptu. Yeniden deneniyor...", "warn");
+                updateWsStatus(false, "WebSocket: disconnected");
+                logConsole("WebSocket disconnected. Reconnecting...", "warn");
                 setTimeout(initWebSocket, wsReconnectInterval);
             };
 
-            ws.onerror = function(err) {
-                console.error("WebSocket error:", err);
-                updateWsStatus(false, "WebSocket Hatası");
+            ws.onerror = function() {
+                updateWsStatus(false, "WebSocket: error");
             };
 
             ws.onmessage = function(evt) {
                 try {
                     const data = JSON.parse(evt.data);
-                    
-                    // Update variables
-                    if (data.m1Pos !== undefined) {
-                        document.getElementById("m1-pos-pulse").innerText = data.m1Pos;
-                        document.getElementById("m1-pos-val").innerText = Number(data.m1PosU).toFixed(2);
-                        document.getElementById("m1-pos-unit").innerText = getUnitName(data.m1Unit);
+                    if (data.configUpdate) {
+                        if (activeTab === "settings") populateConfigFields(data);
+                        return;
                     }
-                    if (data.m2Pos !== undefined) {
-                        document.getElementById("m2-pos-pulse").innerText = data.m2Pos;
-                        document.getElementById("m2-pos-val").innerText = Number(data.m2PosU).toFixed(2);
-                        document.getElementById("m2-pos-unit").innerText = getUnitName(data.m2Unit);
-                    }
-
-                    if (data.m1Target !== undefined) {
-                        document.getElementById("m1-target-pulse").innerText = data.m1Target;
-                        document.getElementById("m1-target-val").innerText = Number(data.m1TargetU).toFixed(2);
-                        document.getElementById("m1-target-unit").innerText = getUnitName(data.m1Unit);
-                        m1TargetPos = data.m1Target;
-                    }
-                    if (data.m2Target !== undefined) {
-                        document.getElementById("m2-target-pulse").innerText = data.m2Target;
-                        document.getElementById("m2-target-val").innerText = Number(data.m2TargetU).toFixed(2);
-                        document.getElementById("m2-target-unit").innerText = getUnitName(data.m2Unit);
-                        m2TargetPos = data.m2Target;
-                    }
-
-                    if (data.m1Dist !== undefined) {
-                        document.getElementById("m1-dist-val").innerText = Number(data.m1DistU).toFixed(2);
-                        document.getElementById("m1-dist-unit").innerText = getUnitName(data.m1Unit);
-                    }
-                    if (data.m2Dist !== undefined) {
-                        document.getElementById("m2-dist-val").innerText = Number(data.m2DistU).toFixed(2);
-                        document.getElementById("m2-dist-unit").innerText = getUnitName(data.m2Unit);
-                    }
-
-                    if (data.m1Speed !== undefined) document.getElementById("m1-speed").innerText = Math.round(data.m1Speed);
-                    if (data.m1Accel !== undefined) document.getElementById("m1-accel").innerText = Math.round(data.m1Accel);
-                    if (data.m2Speed !== undefined) document.getElementById("m2-speed").innerText = Math.round(data.m2Speed);
-                    if (data.m2Accel !== undefined) document.getElementById("m2-accel").innerText = Math.round(data.m2Accel);
-
-                    // Indicators
-                    updateIndicator("m1-sw", data.m1Sw);
-                    updateIndicator("m2-sw", data.m2Sw);
-                    updateIndicator("m1-en", data.m1En);
-                    updateIndicator("m2-en", data.m2En);
-
-                    // Home Ok Status
-                    const m1HomeOkText = document.getElementById("m1-home-ok");
-                    if (data.m1HomeOk) {
-                        m1HomeOkText.innerText = "Tamamlandı";
-                        m1HomeOkText.style.color = "var(--success)";
-                    } else {
-                        m1HomeOkText.innerText = "Bulunmadı";
-                        m1HomeOkText.style.color = "var(--danger)";
-                    }
-
-                    const m2HomeOkText = document.getElementById("m2-home-ok");
-                    if (data.m2HomeOk) {
-                        m2HomeOkText.innerText = "Tamamlandı";
-                        m2HomeOkText.style.color = "var(--success)";
-                    } else {
-                        m2HomeOkText.innerText = "Bulunmadı";
-                        m2HomeOkText.style.color = "var(--danger)";
-                    }
-
-                    // Progress percentages
-                    if (data.m1Percent !== undefined) {
-                        document.getElementById("m1-progress-pct").innerText = data.m1Percent + "%";
-                        document.getElementById("m1-progress-bar").style.width = data.m1Percent + "%";
-                    }
-                    if (data.m2Percent !== undefined) {
-                        document.getElementById("m2-progress-pct").innerText = data.m2Percent + "%";
-                        document.getElementById("m2-progress-bar").style.width = data.m2Percent + "%";
-                    }
-
-                    // Motor statuses
-                    setMotorStatusBadge(1, data.m1Status);
-                    setMotorStatusBadge(2, data.m2Status);
-
-                    // Telemetry & Uptime
-                    if (data.wifiMode !== undefined) document.getElementById("sys-wifi-mode").innerText = data.wifiMode;
-                    if (data.wifiIP !== undefined) document.getElementById("sys-wifi-ip").innerText = data.wifiIP;
-                    if (data.uptime !== undefined) document.getElementById("sys-uptime").innerText = formatUptime(data.uptime);
-                    if (data.heap !== undefined) document.getElementById("sys-heap").innerText = Math.round(data.heap / 1024) + " KB";
-                    if (data.wdt !== undefined) {
-                        const wdtText = document.getElementById("sys-wdt");
-                        wdtText.innerText = data.wdt ? "AKTİF" : "PASİF";
-                        wdtText.style.color = data.wdt ? "var(--success)" : "var(--danger)";
-                    }
-
-                    // Handle warnings/logs
-                    if (data.log) {
-                        const isWarn = data.log.includes("Hata") || data.log.includes("limit") || data.log.includes("Fail");
-                        logConsole(data.log, isWarn ? "warn" : "info");
-                    }
-
-                    // Fill Configuration fields if received (only once on load)
-                    if (data.configUpdate && activeTab === 'settings') {
-                        // Avoid overwriting user's typing, only populate if input fields are untouched
-                        populateConfigFields(data);
-                    }
-
+                    updateTelemetry(data);
                 } catch (e) {
-                    console.error("JSON parse error:", e);
+                    console.error("JSON parse error", e);
                 }
             };
         }
 
-        function populateConfigFields(data) {
-            if (!document.activeElement || document.activeElement.tagName !== 'INPUT') {
-                if (data.m1Cfg) {
-                    document.getElementById("m1-cfg-speed").value = data.m1Cfg.maxSpeed;
-                    document.getElementById("m1-cfg-accel").value = data.m1Cfg.acceleration;
-                    document.getElementById("m1-cfg-min").value = data.m1Cfg.minPosition;
-                    document.getElementById("m1-cfg-max").value = data.m1Cfg.maxPosition;
-                    document.getElementById("m1-cfg-angle").value = data.m1Cfg.stepAngle;
-                    document.getElementById("m1-cfg-usteps").value = data.m1Cfg.microsteps;
-                    document.getElementById("m1-cfg-drive").value = data.m1Cfg.driveType;
-                    document.getElementById("m1-cfg-pitch").value = data.m1Cfg.leadScrewPitch;
-                    document.getElementById("m1-cfg-beltpitch").value = data.m1Cfg.beltPitch;
-                    document.getElementById("m1-cfg-teeth").value = data.m1Cfg.pulleyTeeth;
-                    document.getElementById("m1-cfg-unit").value = data.m1Cfg.unitType;
-                    toggleDriveInputs(1);
-                }
-                if (data.m2Cfg) {
-                    document.getElementById("m2-cfg-speed").value = data.m2Cfg.maxSpeed;
-                    document.getElementById("m2-cfg-accel").value = data.m2Cfg.acceleration;
-                    document.getElementById("m2-cfg-min").value = data.m2Cfg.minPosition;
-                    document.getElementById("m2-cfg-max").value = data.m2Cfg.maxPosition;
-                    document.getElementById("m2-cfg-angle").value = data.m2Cfg.stepAngle;
-                    document.getElementById("m2-cfg-usteps").value = data.m2Cfg.microsteps;
-                    document.getElementById("m2-cfg-drive").value = data.m2Cfg.driveType;
-                    document.getElementById("m2-cfg-pitch").value = data.m2Cfg.leadScrewPitch;
-                    document.getElementById("m2-cfg-beltpitch").value = data.m2Cfg.beltPitch;
-                    document.getElementById("m2-cfg-teeth").value = data.m2Cfg.pulleyTeeth;
-                    document.getElementById("m2-cfg-unit").value = data.m2Cfg.unitType;
-                    toggleDriveInputs(2);
-                }
-                if (data.sysCfg) {
-                    document.getElementById("sys-cfg-timeout-active").value = data.sysCfg.timeoutActive ? "1" : "0";
-                    document.getElementById("sys-cfg-timeout-duration").value = data.sysCfg.timeoutDuration;
-                }
+        function updateTelemetry(data) {
+            updateMotorTelemetry(1, data);
+            updateMotorTelemetry(2, data);
+
+            if (data.wifiMode !== undefined) document.getElementById("sys-wifi-mode").innerText = data.wifiMode;
+            if (data.wifiIP !== undefined) document.getElementById("sys-wifi-ip").innerText = data.wifiIP;
+            if (data.uptime !== undefined) document.getElementById("sys-uptime").innerText = formatUptime(data.uptime);
+            if (data.heap !== undefined) document.getElementById("sys-heap").innerText = Math.round(data.heap / 1024) + " KB";
+            if (data.wdt !== undefined) {
+                const wdt = document.getElementById("sys-wdt");
+                wdt.innerText = data.wdt ? "Active" : "Inactive";
+                wdt.style.color = data.wdt ? "var(--success)" : "var(--danger)";
+            }
+
+            updateRelayTelemetry(1, data.r1Active, data.r1Remaining);
+            updateRelayTelemetry(2, data.r2Active, data.r2Remaining);
+
+            if (data.log) {
+                const isWarn = data.log.includes("Error") || data.log.includes("limit") || data.log.includes("Emergency");
+                logConsole(data.log, isWarn ? "warn" : "info");
             }
         }
 
-        function updateWsStatus(connected, text) {
-            const dot = document.getElementById("ws-status-dot");
-            const label = document.getElementById("ws-status-text");
-            if (connected) {
-                dot.classList.add("connected");
-            } else {
-                dot.classList.remove("connected");
+        function updateMotorTelemetry(motorId, data) {
+            const prefix = "m" + motorId;
+            const pos = data[prefix + "Pos"];
+            const unit = data[prefix + "Unit"];
+            if (pos !== undefined) {
+                document.getElementById(prefix + "-pos-pulse").innerText = pos;
+                document.getElementById(prefix + "-pos-val").innerText = Number(data[prefix + "PosU"]).toFixed(2);
+                document.getElementById(prefix + "-pos-unit").innerText = getUnitName(unit);
             }
-            label.innerText = text;
+            if (data[prefix + "Target"] !== undefined) {
+                document.getElementById(prefix + "-target-pulse").innerText = data[prefix + "Target"];
+                document.getElementById(prefix + "-target-val").innerText = Number(data[prefix + "TargetU"]).toFixed(2);
+                document.getElementById(prefix + "-target-unit").innerText = getUnitName(unit);
+            }
+            if (data[prefix + "Dist"] !== undefined) {
+                document.getElementById(prefix + "-dist-val").innerText = Number(data[prefix + "DistU"]).toFixed(2);
+                document.getElementById(prefix + "-dist-unit").innerText = getUnitName(unit);
+            }
+            if (data[prefix + "Speed"] !== undefined) document.getElementById(prefix + "-speed").innerText = Math.round(data[prefix + "Speed"]);
+            if (data[prefix + "Accel"] !== undefined) document.getElementById(prefix + "-accel").innerText = Math.round(data[prefix + "Accel"]);
+
+            updateIndicator(prefix + "-sw", data[prefix + "Sw"]);
+            updateIndicator(prefix + "-en", data[prefix + "En"]);
+
+            const home = document.getElementById(prefix + "-home-ok");
+            if (data[prefix + "HomeOk"]) {
+                home.innerText = "Complete";
+                home.style.color = "var(--success)";
+            } else {
+                home.innerText = "Not Set";
+                home.style.color = "var(--danger)";
+            }
+
+            if (data[prefix + "Percent"] !== undefined) {
+                document.getElementById(prefix + "-progress-pct").innerText = data[prefix + "Percent"] + "%";
+                document.getElementById(prefix + "-progress-bar").style.width = data[prefix + "Percent"] + "%";
+            }
+            setMotorStatusBadge(motorId, data[prefix + "Status"]);
+        }
+
+        function updateRelayTelemetry(relayId, active, remaining) {
+            if (active === undefined) return;
+            updateIndicator("r" + relayId + "-ind", active);
+            document.getElementById("r" + relayId + "-state").innerText = active ? "On" : "Off";
+            document.getElementById("r" + relayId + "-remaining").innerText = remaining || 0;
+        }
+
+        function populateConfigFields(data) {
+            if (document.activeElement && document.activeElement.tagName === "INPUT") return;
+            if (data.m1Cfg) fillMotorConfig(1, data.m1Cfg);
+            if (data.m2Cfg) fillMotorConfig(2, data.m2Cfg);
+            if (data.sysCfg) {
+                document.getElementById("sys-cfg-timeout-active").value = data.sysCfg.timeoutActive ? "1" : "0";
+                document.getElementById("sys-cfg-timeout-duration").value = data.sysCfg.timeoutDuration;
+            }
+        }
+
+        function fillMotorConfig(id, cfg) {
+            document.getElementById("m" + id + "-cfg-speed").value = cfg.maxSpeed;
+            document.getElementById("m" + id + "-cfg-accel").value = cfg.acceleration;
+            document.getElementById("m" + id + "-cfg-min").value = cfg.minPosition;
+            document.getElementById("m" + id + "-cfg-max").value = cfg.maxPosition;
+            document.getElementById("m" + id + "-cfg-angle").value = cfg.stepAngle;
+            document.getElementById("m" + id + "-cfg-usteps").value = cfg.microsteps;
+            document.getElementById("m" + id + "-cfg-drive").value = cfg.driveType;
+            document.getElementById("m" + id + "-cfg-pitch").value = cfg.leadScrewPitch;
+            document.getElementById("m" + id + "-cfg-beltpitch").value = cfg.beltPitch;
+            document.getElementById("m" + id + "-cfg-teeth").value = cfg.pulleyTeeth;
+            document.getElementById("m" + id + "-cfg-unit").value = cfg.unitType;
+            toggleDriveInputs(id);
+        }
+
+        function updateWsStatus(connected, text) {
+            document.getElementById("ws-status-dot").classList.toggle("connected", connected);
+            document.getElementById("ws-status-text").innerText = text;
         }
 
         function updateIndicator(id, active) {
             const el = document.getElementById(id);
-            if (active) {
-                el.classList.add("active");
-            } else {
-                el.classList.remove("active");
-            }
+            if (el) el.classList.toggle("active", !!active);
         }
 
         function getUnitName(val) {
-            switch(val) {
+            switch (val) {
                 case 1: return "mm";
                 case 2: return "cm";
                 case 3: return "deg";
-                case 0:
                 default: return "pulse";
             }
         }
 
         function setMotorStatusBadge(motorId, status) {
-            const badge = document.getElementById(`m${motorId}-status-badge`);
-            badge.className = "badge"; // Reset classes
-            
-            // Statuses: 0: Disabled/Pasif, 1: Idle (Ready), 2: Moving, 3: Homing, 4: Error/Failed
-            switch(status) {
+            const badge = document.getElementById("m" + motorId + "-status-badge");
+            badge.className = "badge";
+            switch (status) {
                 case 0:
-                    badge.innerText = "Pasif";
+                    badge.innerText = "Disabled";
                     badge.classList.add("badge-disabled");
                     break;
                 case 1:
-                    badge.innerText = "Hazır";
+                    badge.innerText = "Ready";
                     badge.classList.add("badge-idle");
                     break;
                 case 2:
-                    badge.innerText = "Hareketli";
+                    badge.innerText = "Moving";
                     badge.classList.add("badge-moving");
                     break;
                 case 3:
                     badge.innerText = "Homing";
                     badge.classList.add("badge-homing");
                     break;
-                case 4:
                 default:
-                    badge.innerText = "Hata";
+                    badge.innerText = "Error";
                     badge.classList.add("badge-error");
                     break;
             }
@@ -1158,196 +923,149 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
             const hrs = Math.floor(seconds / 3600);
             const mins = Math.floor((seconds % 3600) / 60);
             const secs = seconds % 60;
-            return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            return [hrs, mins, secs].map(v => String(v).padStart(2, "0")).join(":");
         }
 
         function logConsole(message, type = "info") {
             const consoleEl = document.getElementById("sys-console");
             const now = new Date();
-            const timeStr = `[${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}]`;
-            
-            let colorClass = "";
-            if (type === "warn") colorClass = "console-warn";
-            else if (type === "error") colorClass = "console-err";
-
-            consoleEl.innerHTML += `
-                <div class="console-entry ${colorClass}">
-                    <span class="console-time">${timeStr}</span>
-                    <span class="console-text">${message}</span>
-                </div>
-            `;
+            const time = "[" + String(now.getHours()).padStart(2, "0") + ":" + String(now.getMinutes()).padStart(2, "0") + ":" + String(now.getSeconds()).padStart(2, "0") + "]";
+            const cls = type === "error" ? "console-err" : (type === "warn" ? "console-warn" : "");
+            consoleEl.innerHTML += '<div class="console-entry ' + cls + '"><span class="console-time">' + time + '</span><span>' + escapeHtml(message) + '</span></div>';
             consoleEl.scrollTop = consoleEl.scrollHeight;
         }
 
-        // TAB NAVIGATION
-        function switchTab(tabId) {
-            activeTab = tabId;
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-            
-            event.currentTarget.classList.add('active');
-            document.getElementById(`tab-${tabId}`).classList.add('active');
+        function escapeHtml(value) {
+            return String(value).replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[ch]));
+        }
 
-            if (tabId === 'settings') {
-                // Request configuration details specifically from device
-                sendWsMsg({ cmd: "req_config" });
-            }
+        function switchTab(evt, tabId) {
+            activeTab = tabId;
+            document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+            document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+            evt.currentTarget.classList.add("active");
+            document.getElementById("tab-" + tabId).classList.add("active");
+            if (tabId === "settings") sendWsMsg({ cmd: "req_config" });
         }
 
         function toggleDriveInputs(motorId) {
-            const val = document.getElementById(`m${motorId}-cfg-drive`).value;
-            if (val === "0") {
-                document.getElementById(`m${motorId}-drive-screw`).style.display = "block";
-                document.getElementById(`m${motorId}-drive-belt`).style.display = "none";
-            } else {
-                document.getElementById(`m${motorId}-drive-screw`).style.display = "none";
-                document.getElementById(`m${motorId}-drive-belt`).style.display = "grid";
-            }
+            const drive = document.getElementById("m" + motorId + "-cfg-drive").value;
+            document.getElementById("m" + motorId + "-drive-screw").style.display = drive === "0" ? "flex" : "none";
+            document.getElementById("m" + motorId + "-drive-belt").style.display = drive === "0" ? "none" : "grid";
         }
 
-        // MOTOR ACTIONS
         function sendWsMsg(obj) {
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify(obj));
             } else {
-                logConsole("İşlem Başarısız: WebSocket bağlı değil!", "error");
+                logConsole("Action failed: WebSocket is not connected.", "error");
             }
         }
 
         function moveMotor(motorId) {
-            const input = document.getElementById(`m${motorId}-goto-input`);
-            const val = parseFloat(input.value);
+            const val = parseFloat(document.getElementById("m" + motorId + "-goto-input").value);
             if (isNaN(val)) {
-                logConsole(`Hata: Motor ${motorId} için geçersiz pozisyon değeri.`, "error");
+                logConsole("Invalid target position for Motor " + motorId + ".", "error");
                 return;
             }
-            logConsole(`Motor ${motorId} konumlandırılıyor: ${val}`);
-            sendWsMsg({
-                cmd: "move",
-                motor: motorId,
-                val: val
-            });
+            logConsole("Motor " + motorId + " moving to " + val + ".");
+            sendWsMsg({ cmd: "move", motor: motorId, val: val });
         }
 
         function jogMotor(motorId, amount) {
-            logConsole(`Motor ${motorId} jog hareketi: ${amount}`);
-            sendWsMsg({
-                cmd: "jog",
-                motor: motorId,
-                val: amount
-            });
+            logConsole("Motor " + motorId + " jog: " + amount + ".");
+            sendWsMsg({ cmd: "jog", motor: motorId, val: amount });
         }
 
         function stopMotor(motorId) {
-            logConsole(`Motor ${motorId} durduruluyor...`);
-            sendWsMsg({
-                cmd: "stop",
-                motor: motorId
-            });
+            logConsole("Stopping Motor " + motorId + ".");
+            sendWsMsg({ cmd: "stop", motor: motorId });
         }
 
         function homeMotor(motorId) {
-            logConsole(`Motor ${motorId} homing çevrimi başlatılıyor...`);
-            sendWsMsg({
-                cmd: "home",
-                motor: motorId
-            });
+            logConsole("Starting homing cycle for Motor " + motorId + ".");
+            sendWsMsg({ cmd: "home", motor: motorId });
         }
 
         function resetMotorPos(motorId) {
-            logConsole(`Motor ${motorId} pozisyonu sıfırlanıyor.`);
-            sendWsMsg({
-                cmd: "reset",
-                motor: motorId
-            });
+            logConsole("Resetting Motor " + motorId + " position to zero.");
+            sendWsMsg({ cmd: "reset", motor: motorId });
         }
 
         function enableMotor(motorId, state) {
-            logConsole(`Motor ${motorId} driver ${state ? 'aktif' : 'pasif'} ediliyor.`);
-            sendWsMsg({
-                cmd: "enable",
-                motor: motorId,
-                val: state ? 1 : 0
-            });
+            logConsole((state ? "Enabling" : "Disabling") + " Motor " + motorId + " driver.");
+            sendWsMsg({ cmd: "enable", motor: motorId, val: state ? 1 : 0 });
         }
 
         function sendAllStop() {
-            logConsole("ACİL DURDURMA ALINDI! Tüm motorlar durduruluyor.", "error");
-            sendWsMsg({
-                cmd: "allstop"
-            });
+            logConsole("Emergency stop requested. Motors and relays are being stopped.", "error");
+            sendWsMsg({ cmd: "allstop" });
+        }
+
+        function triggerRelay(relayId) {
+            const input = document.getElementById("r" + relayId + "-duration");
+            let duration = parseInt(input.value, 10);
+            if (isNaN(duration) || duration < 1) duration = 1;
+            if (duration > 86400) duration = 86400;
+            input.value = duration;
+            logConsole("Relay " + relayId + " triggered for " + duration + " seconds.");
+            sendWsMsg({ cmd: "relay_trigger", relay: relayId, duration: duration });
+        }
+
+        function turnRelayOff(relayId) {
+            logConsole("Relay " + relayId + " manual off requested.");
+            sendWsMsg({ cmd: "relay_off", relay: relayId });
         }
 
         function rebootESP() {
-            if (confirm("ESP32 cihazını yeniden başlatmak istediğinize emin misiniz?")) {
-                logConsole("Sistem yeniden başlatılıyor...", "warn");
+            if (confirm("Restart the ESP32 now?")) {
+                logConsole("Restart command sent.", "warn");
                 sendWsMsg({ cmd: "reboot" });
             }
         }
 
-        // SAVE CONFIGURATIONS
         function saveMotorSettings() {
             const cfg = {
                 cmd: "save_config",
-                m1: {
-                    maxSpeed: parseFloat(document.getElementById("m1-cfg-speed").value),
-                    acceleration: parseFloat(document.getElementById("m1-cfg-accel").value),
-                    minPosition: parseInt(document.getElementById("m1-cfg-min").value),
-                    maxPosition: parseInt(document.getElementById("m1-cfg-max").value),
-                    stepAngle: parseFloat(document.getElementById("m1-cfg-angle").value),
-                    microsteps: parseInt(document.getElementById("m1-cfg-usteps").value),
-                    driveType: parseInt(document.getElementById("m1-cfg-drive").value),
-                    leadScrewPitch: parseFloat(document.getElementById("m1-cfg-pitch").value),
-                    beltPitch: parseFloat(document.getElementById("m1-cfg-beltpitch").value),
-                    pulleyTeeth: parseInt(document.getElementById("m1-cfg-teeth").value),
-                    unitType: parseInt(document.getElementById("m1-cfg-unit").value)
-                },
-                m2: {
-                    maxSpeed: parseFloat(document.getElementById("m2-cfg-speed").value),
-                    acceleration: parseFloat(document.getElementById("m2-cfg-accel").value),
-                    minPosition: parseInt(document.getElementById("m2-cfg-min").value),
-                    maxPosition: parseInt(document.getElementById("m2-cfg-max").value),
-                    stepAngle: parseFloat(document.getElementById("m2-cfg-angle").value),
-                    microsteps: parseInt(document.getElementById("m2-cfg-usteps").value),
-                    driveType: parseInt(document.getElementById("m2-cfg-drive").value),
-                    leadScrewPitch: parseFloat(document.getElementById("m2-cfg-pitch").value),
-                    beltPitch: parseFloat(document.getElementById("m2-cfg-beltpitch").value),
-                    pulleyTeeth: parseInt(document.getElementById("m2-cfg-teeth").value),
-                    unitType: parseInt(document.getElementById("m2-cfg-unit").value)
-                },
+                m1: readMotorConfig(1),
+                m2: readMotorConfig(2),
                 sys: {
                     timeoutActive: document.getElementById("sys-cfg-timeout-active").value === "1",
-                    timeoutDuration: parseInt(document.getElementById("sys-cfg-timeout-duration").value)
+                    timeoutDuration: parseInt(document.getElementById("sys-cfg-timeout-duration").value, 10)
                 }
             };
-            
-            logConsole("Motor mekanik ayarları gönderiliyor...");
+            logConsole("Sending motor settings.");
             sendWsMsg(cfg);
+        }
+
+        function readMotorConfig(id) {
+            return {
+                maxSpeed: parseFloat(document.getElementById("m" + id + "-cfg-speed").value),
+                acceleration: parseFloat(document.getElementById("m" + id + "-cfg-accel").value),
+                minPosition: parseInt(document.getElementById("m" + id + "-cfg-min").value, 10),
+                maxPosition: parseInt(document.getElementById("m" + id + "-cfg-max").value, 10),
+                stepAngle: parseFloat(document.getElementById("m" + id + "-cfg-angle").value),
+                microsteps: parseInt(document.getElementById("m" + id + "-cfg-usteps").value, 10),
+                driveType: parseInt(document.getElementById("m" + id + "-cfg-drive").value, 10),
+                leadScrewPitch: parseFloat(document.getElementById("m" + id + "-cfg-pitch").value),
+                beltPitch: parseFloat(document.getElementById("m" + id + "-cfg-beltpitch").value),
+                pulleyTeeth: parseInt(document.getElementById("m" + id + "-cfg-teeth").value, 10),
+                unitType: parseInt(document.getElementById("m" + id + "-cfg-unit").value, 10)
+            };
         }
 
         function saveWifiSettings() {
             const ssid = document.getElementById("wifi-ssid").value;
             const pass = document.getElementById("wifi-pass").value;
-
-            if (ssid.length === 0) {
-                alert("Wi-Fi SSID adı boş bırakılamaz!");
+            if (!ssid.length) {
+                alert("Wi-Fi SSID cannot be empty.");
                 return;
             }
-
-            const wifiCfg = {
-                cmd: "save_wifi",
-                ssid: ssid,
-                pass: pass
-            };
-
-            logConsole("Wi-Fi ayarları kaydediliyor, ESP32 yeniden bağlanacak...");
-            sendWsMsg(wifiCfg);
+            logConsole("Saving Wi-Fi settings. Restart the ESP32 to apply them.");
+            sendWsMsg({ cmd: "save_wifi", ssid: ssid, pass: pass });
         }
 
-        // Initialize on load
-        window.addEventListener('load', () => {
-            initWebSocket();
-        });
+        window.addEventListener("load", initWebSocket);
     </script>
 </body>
 </html>

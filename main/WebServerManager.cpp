@@ -1,7 +1,8 @@
 #include "WebServerManager.h"
 
-WebServerManager::WebServerManager(StorageManager& storage, MotorController& m1, MotorController& m2)
-    : _storage(storage), _m1(m1), _m2(m2), _server(80), _ws("/ws"), 
+WebServerManager::WebServerManager(StorageManager& storage, MotorController& m1, MotorController& m2,
+                                   RelayController& r1, RelayController& r2)
+    : _storage(storage), _m1(m1), _m2(m2), _r1(r1), _r2(r2), _server(80), _ws("/ws"),
       _lastBroadcastTime(0), _hasPendingLog(false) {}
 
 void WebServerManager::begin() {
@@ -117,14 +118,14 @@ void WebServerManager::setupRoutes() {
     // REST: POST /motor1/home
     _server.on("/motor1/home", HTTP_POST, [this](AsyncWebServerRequest *request) {
         _m1.startHoming();
-        queueLog("Motor 1 homing REST ile başlatıldı.");
+        queueLog("Motor 1 homing started by REST.");
         request->send(200, "application/json", "{\"status\":\"ok\"}");
     });
 
     // REST: POST /motor2/home
     _server.on("/motor2/home", HTTP_POST, [this](AsyncWebServerRequest *request) {
         _m2.startHoming();
-        queueLog("Motor 2 homing REST ile başlatıldı.");
+        queueLog("Motor 2 homing started by REST.");
         request->send(200, "application/json", "{\"status\":\"ok\"}");
     });
 
@@ -168,7 +169,9 @@ void WebServerManager::setupRoutes() {
     _server.on("/allstop", HTTP_POST, [this](AsyncWebServerRequest *request) {
         _m1.stop();
         _m2.stop();
-        queueLog("ACİL DUR REST ile alındı!");
+        _r1.turnOff();
+        _r2.turnOff();
+        queueLog("Emergency stop received by REST.");
         request->send(200, "application/json", "{\"status\":\"ok\"}");
     });
 
@@ -267,11 +270,11 @@ void WebServerManager::processJsonCommand(JsonDocument& doc, AsyncWebSocketClien
         float val = doc["val"] | 0.0f;
         if (motor == 1) {
             if (!_m1.moveTo(val)) {
-                queueLog("Hata: Motor 1 yazılımsal sınır ihlali!");
+                queueLog("Error: Motor 1 soft limit violation.");
             }
         } else {
             if (!_m2.moveTo(val)) {
-                queueLog("Hata: Motor 2 yazılımsal sınır ihlali!");
+                queueLog("Error: Motor 2 soft limit violation.");
             }
         }
     } 
@@ -281,12 +284,12 @@ void WebServerManager::processJsonCommand(JsonDocument& doc, AsyncWebSocketClien
         if (motor == 1) {
             long steps = _m1.unitsToSteps(val);
             if (!_m1.moveRelative(steps)) {
-                queueLog("Hata: Motor 1 yazılımsal sınır ihlali!");
+                queueLog("Error: Motor 1 soft limit violation.");
             }
         } else {
             long steps = _m2.unitsToSteps(val);
             if (!_m2.moveRelative(steps)) {
-                queueLog("Hata: Motor 2 yazılımsal sınır ihlali!");
+                queueLog("Error: Motor 2 soft limit violation.");
             }
         }
     }
@@ -298,10 +301,10 @@ void WebServerManager::processJsonCommand(JsonDocument& doc, AsyncWebSocketClien
     else if (cmd == "home") {
         int motor = doc["motor"] | 1;
         if (motor == 1) {
-            queueLog("Motor 1 homing başlatıldı.");
+            queueLog("Motor 1 homing started.");
             _m1.startHoming();
         } else {
-            queueLog("Motor 2 homing başlatıldı.");
+            queueLog("Motor 2 homing started.");
             _m2.startHoming();
         }
     }
@@ -309,10 +312,10 @@ void WebServerManager::processJsonCommand(JsonDocument& doc, AsyncWebSocketClien
         int motor = doc["motor"] | 1;
         if (motor == 1) {
             _m1.resetPosition();
-            queueLog("Motor 1 pozisyonu sıfırlandı.");
+            queueLog("Motor 1 position reset to zero.");
         } else {
             _m2.resetPosition();
-            queueLog("Motor 2 pozisyonu sıfırlandı.");
+            queueLog("Motor 2 position reset to zero.");
         }
     }
     else if (cmd == "enable") {
@@ -324,7 +327,33 @@ void WebServerManager::processJsonCommand(JsonDocument& doc, AsyncWebSocketClien
     else if (cmd == "allstop") {
         _m1.stop();
         _m2.stop();
-        queueLog("ACİL DURDURMA ALINDI!");
+        _r1.turnOff();
+        _r2.turnOff();
+        queueLog("Emergency stop received.");
+    }
+    else if (cmd == "relay_trigger") {
+        int relay = doc["relay"] | 1;
+        uint32_t duration = doc["duration"] | 1;
+        if (duration > 86400) duration = 86400;
+
+        if (relay == 1) {
+            _r1.trigger(duration);
+            queueLog("Relay 1 triggered for " + String(duration) + " seconds.");
+        } else {
+            _r2.trigger(duration);
+            queueLog("Relay 2 triggered for " + String(duration) + " seconds.");
+        }
+    }
+    else if (cmd == "relay_off") {
+        int relay = doc["relay"] | 1;
+
+        if (relay == 1) {
+            _r1.turnOff();
+            queueLog("Relay 1 turned off.");
+        } else {
+            _r2.turnOff();
+            queueLog("Relay 2 turned off.");
+        }
     }
     else if (cmd == "reboot") {
         delay(200);
@@ -382,7 +411,7 @@ void WebServerManager::processJsonCommand(JsonDocument& doc, AsyncWebSocketClien
             _m1.setEnableTimeout(sysCfg.enableTimeoutActive, sysCfg.enableTimeoutDuration);
             _m2.setEnableTimeout(sysCfg.enableTimeoutActive, sysCfg.enableTimeoutDuration);
         }
-        queueLog("Sistem ayarları kaydedildi.");
+        queueLog("System settings saved.");
         _ws.textAll(getConfigJson()); // broadcast updated config to all
     }
     else if (cmd == "save_wifi") {
@@ -392,7 +421,7 @@ void WebServerManager::processJsonCommand(JsonDocument& doc, AsyncWebSocketClien
         strncpy(wifiCfg.ssid, ssid.c_str(), sizeof(wifiCfg.ssid));
         strncpy(wifiCfg.password, pass.c_str(), sizeof(wifiCfg.password));
         _storage.saveWifiConfig(wifiCfg);
-        queueLog("WiFi ayarları kaydedildi. Reboot bekleniyor.");
+        queueLog("WiFi settings saved. Reboot required.");
     }
 }
 
@@ -487,6 +516,12 @@ String WebServerManager::getTelemetryJson() {
     doc["uptime"] = millis() / 1000;
     doc["heap"] = ESP.getFreeHeap();
     doc["wdt"] = true; // Task watchdog is running and checked in main.ino
+    doc["r1Active"] = _r1.isActive();
+    doc["r1Remaining"] = _r1.getRemainingSeconds();
+    doc["r1Pin"] = _r1.getPin();
+    doc["r2Active"] = _r2.isActive();
+    doc["r2Remaining"] = _r2.getRemainingSeconds();
+    doc["r2Pin"] = _r2.getPin();
     
     if (_hasPendingLog) {
         doc["log"] = _pendingLog;
