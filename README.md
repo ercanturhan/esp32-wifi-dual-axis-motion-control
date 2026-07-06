@@ -1,4 +1,4 @@
-# ESP32 WiFi Dual Axis Motion Control
+# ESP32 WiFi Dual Axis Stepper Motor Control
 
 ESP32 firmware for controlling two stepper motors with DRV8825 drivers from an embedded WiFi web dashboard. The interface provides live WebSocket telemetry, absolute movement, jog movement, homing, driver enable control, Wi-Fi configuration, and two timed relay outputs.
 
