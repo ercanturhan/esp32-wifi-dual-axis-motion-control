@@ -257,7 +257,8 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
         }
 
         input,
-        select {
+        select,
+        textarea {
             width: 100%;
             background: rgba(255, 255, 255, 0.05);
             color: var(--text);
@@ -268,8 +269,16 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
             font-size: 0.93rem;
         }
 
+        textarea {
+            min-height: 300px;
+            resize: vertical;
+            font-family: Consolas, monospace;
+            line-height: 1.45;
+        }
+
         input:focus,
-        select:focus {
+        select:focus,
+        textarea:focus {
             border-color: var(--primary);
             box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
         }
@@ -296,6 +305,32 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
 
         .relay-card .stat-grid {
             grid-template-columns: 1fr;
+        }
+
+        .program-grid {
+            display: grid;
+            grid-template-columns: minmax(360px, 1.35fr) minmax(300px, 0.8fr);
+            gap: 18px;
+            align-items: start;
+        }
+
+        .program-status {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .command-list {
+            display: grid;
+            gap: 8px;
+            color: var(--muted);
+            font-size: 0.84rem;
+            line-height: 1.45;
+        }
+
+        .command-list code {
+            color: #bfdbfe;
+            font-family: Consolas, monospace;
         }
 
         .btn,
@@ -371,6 +406,9 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
             .dashboard-grid {
                 grid-template-columns: 1fr;
             }
+            .program-grid {
+                grid-template-columns: 1fr;
+            }
         }
 
         @media (max-width: 720px) {
@@ -385,7 +423,8 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
                 width: 100%;
             }
             .stat-grid,
-            .state-row {
+            .state-row,
+            .program-status {
                 grid-template-columns: 1fr;
             }
         }
@@ -395,7 +434,7 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
     <header>
         <div>
             <h1>ESP32 Dual Axis Motion Control</h1>
-            <div class="subtitle">Two stepper motors, homing switches, timed relay outputs, and live telemetry.</div>
+            <div class="subtitle">Two stepper motors, homing switches, timed general outputs, and live telemetry.</div>
         </div>
         <div class="header-actions">
             <span class="status-badge">
@@ -409,6 +448,7 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
     <nav class="tabs">
         <button class="tab active" onclick="switchTab(event, 'dashboard')">Dashboard</button>
         <button class="tab" onclick="switchTab(event, 'settings')">Motor Settings</button>
+        <button class="tab" onclick="switchTab(event, 'program')">Program</button>
         <button class="tab" onclick="switchTab(event, 'wifi-tab')">Wi-Fi Settings</button>
     </nav>
 
@@ -551,14 +591,14 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
             <article class="card relay-card">
                 <div class="card-title">
                     <div>
-                        <h2>Timed Relay Outputs</h2>
-                        <div class="subtitle">Relay 1 uses GPIO23. Relay 2 uses GPIO5. The output turns off automatically when the timer expires.</div>
+                        <h2>Timed General Outputs</h2>
+                        <div class="subtitle">Gen.Out1 uses GPIO23. Gen.Out2 uses GPIO5. The output turns off automatically when the timer expires.</div>
                     </div>
                 </div>
                 <div class="relay-grid">
                     <div class="stat-box">
                         <div class="card-title" style="border:0;padding:0;margin-bottom:8px">
-                            <h3>Relay 1</h3>
+                            <h3>Gen.Out1</h3>
                             <span class="status-badge"><span id="r1-ind" class="indicator"></span><span id="r1-state">Off</span></span>
                         </div>
                         <div class="stat-grid">
@@ -572,14 +612,14 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
                             </div>
                         </div>
                         <div class="button-row" style="margin-top:10px">
-                            <button class="btn btn-success" onclick="triggerRelay(1)">Trigger Relay 1</button>
+                            <button class="btn btn-success" onclick="triggerRelay(1)">Trigger Gen.Out1</button>
                             <button class="btn btn-danger" onclick="turnRelayOff(1)">Turn Off</button>
                         </div>
                     </div>
 
                     <div class="stat-box">
                         <div class="card-title" style="border:0;padding:0;margin-bottom:8px">
-                            <h3>Relay 2</h3>
+                            <h3>Gen.Out2</h3>
                             <span class="status-badge"><span id="r2-ind" class="indicator"></span><span id="r2-state">Off</span></span>
                         </div>
                         <div class="stat-grid">
@@ -593,7 +633,7 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
                             </div>
                         </div>
                         <div class="button-row" style="margin-top:10px">
-                            <button class="btn btn-success" onclick="triggerRelay(2)">Trigger Relay 2</button>
+                            <button class="btn btn-success" onclick="triggerRelay(2)">Trigger Gen.Out2</button>
                             <button class="btn btn-danger" onclick="turnRelayOff(2)">Turn Off</button>
                         </div>
                     </div>
@@ -738,6 +778,75 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
         </article>
     </section>
 
+    <section id="tab-program" class="tab-content">
+        <div class="program-grid">
+            <article class="card">
+                <div class="card-title">
+                    <div>
+                        <h2>Sequential Program</h2>
+                        <div class="subtitle">Write one command per line. The ESP32 runs the lines in order and waits for each motor move to finish.</div>
+                    </div>
+                    <span id="program-run-badge" class="badge badge-idle">Idle</span>
+                </div>
+
+                <div class="program-status">
+                    <div class="stat-box">
+                        <span class="stat-label">Status</span>
+                        <span class="stat-value" id="program-status">Stopped</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-label">Current Line</span>
+                        <span class="stat-value" id="program-line" style="font-size:0.9rem">-</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-label">Mode</span>
+                        <span class="stat-value" style="font-size:0.9rem">Relative</span>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label for="program-editor">Program Text</label>
+                    <textarea id="program-editor" spellcheck="false"># X and Y values are relative movement in the active motor unit
+# VX and VY values are speed in steps/s
+VX 5000
+VY 5000
+X 50
+Y 10
+D 50
+Gen1 ON
+D 100
+X -50
+Gen2 OFF
+D 200
+Gen1 OFF</textarea>
+                </div>
+
+                <div class="button-row">
+                    <button class="btn btn-success" onclick="runProgram()">Run Program</button>
+                    <button class="btn btn-danger" onclick="stopProgram()">Stop Program</button>
+                </div>
+            </article>
+
+            <article class="card">
+                <div class="card-title">
+                    <h2>Program Help</h2>
+                </div>
+                <div class="command-list">
+                    <div><code>X 50</code> moves the X axis, Motor 1, +50 relative units.</div>
+                    <div><code>X -50</code> moves the X axis, Motor 1, -50 relative units.</div>
+                    <div><code>Y 10</code> moves the Y axis, Motor 2, +10 relative units.</div>
+                    <div><code>VX 5000</code> sets X axis, Motor 1, speed to 5000 steps/s.</div>
+                    <div><code>VY 5000</code> sets Y axis, Motor 2, speed to 5000 steps/s.</div>
+                    <div><code>D 100</code> waits 100 milliseconds before the next line.</div>
+                    <div><code>Gen1 ON</code> turns Gen.Out1 on until another command turns it off.</div>
+                    <div><code>Gen2 OFF</code> turns Gen.Out2 off.</div>
+                    <div>Use <code>#</code> or <code>//</code> for comments. Empty lines are ignored.</div>
+                    <div>The movement unit is the unit selected in Motor Settings: mm, cm, degree, or pulse.</div>
+                </div>
+            </article>
+        </div>
+    </section>
+
     <section id="tab-wifi-tab" class="tab-content">
         <article class="card" style="max-width:620px;margin:0 auto">
             <div class="card-title"><h2>Wi-Fi Connection Settings</h2></div>
@@ -810,6 +919,7 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
 
             updateRelayTelemetry(1, data.r1Active, data.r1Remaining);
             updateRelayTelemetry(2, data.r2Active, data.r2Remaining);
+            updateProgramTelemetry(data);
 
             if (data.log) {
                 const isWarn = data.log.includes("Error") || data.log.includes("limit") || data.log.includes("Emergency");
@@ -862,6 +972,31 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
             updateIndicator("r" + relayId + "-ind", active);
             document.getElementById("r" + relayId + "-state").innerText = active ? "On" : "Off";
             document.getElementById("r" + relayId + "-remaining").innerText = remaining || 0;
+        }
+
+        function updateProgramTelemetry(data) {
+            if (data.programRunning === undefined) return;
+            const badge = document.getElementById("program-run-badge");
+            const status = document.getElementById("program-status");
+            const line = document.getElementById("program-line");
+
+            badge.className = "badge";
+            if (data.programRunning) {
+                badge.innerText = "Running";
+                badge.classList.add("badge-moving");
+            } else if (String(data.programStatus || "").startsWith("Error")) {
+                badge.innerText = "Error";
+                badge.classList.add("badge-error");
+            } else if (data.programStatus === "Completed") {
+                badge.innerText = "Done";
+                badge.classList.add("badge-idle");
+            } else {
+                badge.innerText = "Idle";
+                badge.classList.add("badge-disabled");
+            }
+
+            status.innerText = data.programStatus || "Stopped";
+            line.innerText = data.programLine || "-";
         }
 
         function populateConfigFields(data) {
@@ -1014,8 +1149,25 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
         }
 
         function sendAllStop() {
-            logConsole("Emergency stop requested. Motors and relays are being stopped.", "error");
+            logConsole("Emergency stop requested. Motors and general outputs are being stopped.", "error");
             sendWsMsg({ cmd: "allstop" });
+        }
+
+        function runProgram() {
+            const editor = document.getElementById("program-editor");
+            const program = editor.value.trim();
+            if (!program.length) {
+                logConsole("Program is empty.", "error");
+                return;
+            }
+            localStorage.setItem("motionProgramText", editor.value);
+            logConsole("Program sent to ESP32.");
+            sendWsMsg({ cmd: "program_start", program: editor.value });
+        }
+
+        function stopProgram() {
+            logConsole("Program stop requested.", "warn");
+            sendWsMsg({ cmd: "program_stop" });
         }
 
         function triggerRelay(relayId) {
@@ -1024,12 +1176,12 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
             if (isNaN(duration) || duration < 1) duration = 1;
             if (duration > 86400) duration = 86400;
             input.value = duration;
-            logConsole("Relay " + relayId + " triggered for " + duration + " seconds.");
+            logConsole("Gen.Out" + relayId + " triggered for " + duration + " seconds.");
             sendWsMsg({ cmd: "relay_trigger", relay: relayId, duration: duration });
         }
 
         function turnRelayOff(relayId) {
-            logConsole("Relay " + relayId + " manual off requested.");
+            logConsole("Gen.Out" + relayId + " manual off requested.");
             sendWsMsg({ cmd: "relay_off", relay: relayId });
         }
 
@@ -1081,7 +1233,17 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
             sendWsMsg({ cmd: "save_wifi", ssid: ssid, pass: pass });
         }
 
-        window.addEventListener("load", initWebSocket);
+        window.addEventListener("load", function() {
+            const savedProgram = localStorage.getItem("motionProgramText");
+            if (savedProgram) {
+                const migratedProgram = savedProgram
+                    .replace(/^R1\s+/gmi, "Gen1 ")
+                    .replace(/^R2\s+/gmi, "Gen2 ");
+                document.getElementById("program-editor").value = migratedProgram;
+                if (migratedProgram !== savedProgram) localStorage.setItem("motionProgramText", migratedProgram);
+            }
+            initWebSocket();
+        });
     </script>
 </body>
 </html>

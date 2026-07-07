@@ -41,6 +41,7 @@ public:
     
     // Settings update
     void updateConfig(const MotorConfig& newConfig);
+    bool setRuntimeSpeed(float speedStepsPerSecond);
     
     // Getters for status & telemetry
     int getId() const { return _id; }

@@ -3,7 +3,10 @@
 WebServerManager::WebServerManager(StorageManager& storage, MotorController& m1, MotorController& m2,
                                    RelayController& r1, RelayController& r2)
     : _storage(storage), _m1(m1), _m2(m2), _r1(r1), _r2(r2), _server(80), _ws("/ws"),
-      _lastBroadcastTime(0), _hasPendingLog(false) {}
+      _lastBroadcastTime(0), _hasPendingLog(false),
+      _programStatus("Stopped"),
+      _programRunning(false), _programIndex(0), _programLineNumber(0), _programWaitingMotor(0),
+      _programDelayActive(false), _programDelayStartedAt(0), _programDelayMs(0) {}
 
 void WebServerManager::begin() {
     // 1. Wi-Fi Setup
@@ -42,6 +45,8 @@ void WebServerManager::begin() {
 }
 
 void WebServerManager::update() {
+    updateProgram();
+
     // Broadcast telemetry to WebSocket clients every 200 ms (5 Hz)
     if (millis() - _lastBroadcastTime > 200) {
         _lastBroadcastTime = millis();
@@ -167,6 +172,7 @@ void WebServerManager::setupRoutes() {
 
     // REST: POST /allstop
     _server.on("/allstop", HTTP_POST, [this](AsyncWebServerRequest *request) {
+        stopProgram(false);
         _m1.stop();
         _m2.stop();
         _r1.turnOff();
@@ -251,7 +257,7 @@ void WebServerManager::handleWebSocketMessage(void *arg, uint8_t *data, size_t l
         #if ARDUINOJSON_VERSION_MAJOR >= 7
             JsonDocument doc;
         #else
-            DynamicJsonDocument doc(2048);
+            DynamicJsonDocument doc(4096);
         #endif
         DeserializationError error = deserializeJson(doc, (const uint8_t*)data, len);
         if (!error) {
@@ -325,6 +331,7 @@ void WebServerManager::processJsonCommand(JsonDocument& doc, AsyncWebSocketClien
         else _m2.enableDriver(val == 1);
     }
     else if (cmd == "allstop") {
+        stopProgram(false);
         _m1.stop();
         _m2.stop();
         _r1.turnOff();
@@ -338,10 +345,10 @@ void WebServerManager::processJsonCommand(JsonDocument& doc, AsyncWebSocketClien
 
         if (relay == 1) {
             _r1.trigger(duration);
-            queueLog("Relay 1 triggered for " + String(duration) + " seconds.");
+            queueLog("Gen.Out1 triggered for " + String(duration) + " seconds.");
         } else {
             _r2.trigger(duration);
-            queueLog("Relay 2 triggered for " + String(duration) + " seconds.");
+            queueLog("Gen.Out2 triggered for " + String(duration) + " seconds.");
         }
     }
     else if (cmd == "relay_off") {
@@ -349,11 +356,19 @@ void WebServerManager::processJsonCommand(JsonDocument& doc, AsyncWebSocketClien
 
         if (relay == 1) {
             _r1.turnOff();
-            queueLog("Relay 1 turned off.");
+            queueLog("Gen.Out1 turned off.");
         } else {
             _r2.turnOff();
-            queueLog("Relay 2 turned off.");
+            queueLog("Gen.Out2 turned off.");
         }
+    }
+    else if (cmd == "program_start") {
+        String programText = doc["program"] | "";
+        startProgram(programText);
+    }
+    else if (cmd == "program_stop") {
+        stopProgram(true);
+        queueLog("Program stopped by user.");
     }
     else if (cmd == "reboot") {
         delay(200);
@@ -423,6 +438,225 @@ void WebServerManager::processJsonCommand(JsonDocument& doc, AsyncWebSocketClien
         _storage.saveWifiConfig(wifiCfg);
         queueLog("WiFi settings saved. Reboot required.");
     }
+}
+
+void WebServerManager::startProgram(const String& programText) {
+    if (_m1.isRunning() || _m2.isRunning() || _m1.isHoming() || _m2.isHoming()) {
+        setProgramStatus("Error: motors busy");
+        queueLog("Program could not start because a motor is already moving.");
+        return;
+    }
+
+    _programText = programText;
+    _programIndex = 0;
+    _programLineNumber = 0;
+    _programWaitingMotor = 0;
+    _programDelayActive = false;
+    _programDelayStartedAt = 0;
+    _programDelayMs = 0;
+    _programCurrentLineText = "";
+    _programRunning = true;
+    setProgramStatus("Running");
+    queueLog("Program started.");
+}
+
+void WebServerManager::stopProgram(bool stopOutputs) {
+    _programRunning = false;
+    _programWaitingMotor = 0;
+    _programDelayActive = false;
+    _programCurrentLineText = "";
+    if (stopOutputs) {
+        _m1.stop();
+        _m2.stop();
+        _r1.turnOff();
+        _r2.turnOff();
+    }
+    setProgramStatus("Stopped");
+}
+
+void WebServerManager::updateProgram() {
+    if (!_programRunning) return;
+
+    if (_programDelayActive) {
+        if (millis() - _programDelayStartedAt < _programDelayMs) return;
+        _programDelayActive = false;
+    }
+
+    if (_programWaitingMotor == 1) {
+        if (_m1.isRunning() || _m1.isHoming()) return;
+        _programWaitingMotor = 0;
+    } else if (_programWaitingMotor == 2) {
+        if (_m2.isRunning() || _m2.isHoming()) return;
+        _programWaitingMotor = 0;
+    }
+
+    String line;
+    int lineNumber = 0;
+    if (!readNextProgramLine(line, lineNumber)) {
+        _programRunning = false;
+        _programCurrentLineText = "";
+        setProgramStatus("Completed");
+        queueLog("Program completed.");
+        return;
+    }
+
+    ProgramCommand command;
+    String error;
+    if (!parseProgramLine(line, command, error)) {
+        _programRunning = false;
+        setProgramStatus("Error at line " + String(lineNumber));
+        queueLog("Program error at line " + String(lineNumber) + ": " + error);
+        return;
+    }
+
+    _programCurrentLineText = String(lineNumber) + ": " + line;
+    setProgramStatus("Running line " + String(lineNumber));
+
+    if (command.type == PROGRAM_CMD_MOVE) {
+        MotorController& motor = (command.motor == 1) ? _m1 : _m2;
+        long steps = motor.unitsToSteps(command.value);
+        if (!motor.moveRelative(steps)) {
+            _programRunning = false;
+            setProgramStatus("Error at line " + String(lineNumber));
+            queueLog("Program error at line " + String(lineNumber) + ": soft limit violation.");
+            return;
+        }
+        _programWaitingMotor = command.motor;
+        queueLog("Program line " + String(lineNumber) + ": Motor " + String(command.motor) + " relative move " + String(command.value) + ".");
+    } else if (command.type == PROGRAM_CMD_SPEED) {
+        MotorController& motor = (command.motor == 1) ? _m1 : _m2;
+        if (!motor.setRuntimeSpeed(command.value)) {
+            _programRunning = false;
+            setProgramStatus("Error at line " + String(lineNumber));
+            queueLog("Program error at line " + String(lineNumber) + ": speed must be 1-200000 steps/s.");
+            return;
+        }
+        queueLog("Program line " + String(lineNumber) + ": Motor " + String(command.motor) + " speed set to " + String(command.value) + " steps/s.");
+    } else if (command.type == PROGRAM_CMD_DELAY) {
+        _programDelayActive = true;
+        _programDelayStartedAt = millis();
+        _programDelayMs = command.delayMs;
+        queueLog("Program line " + String(lineNumber) + ": wait " + String(command.delayMs) + " ms.");
+    } else if (command.type == PROGRAM_CMD_RELAY) {
+        RelayController& relay = (command.relay == 1) ? _r1 : _r2;
+        if (command.relayOn) relay.turnOn();
+        else relay.turnOff();
+        queueLog("Program line " + String(lineNumber) + ": Gen.Out" + String(command.relay) + (command.relayOn ? " ON." : " OFF."));
+    }
+}
+
+bool WebServerManager::readNextProgramLine(String& line, int& lineNumber) {
+    while (_programIndex <= _programText.length()) {
+        size_t start = _programIndex;
+        int newlineIndex = _programText.indexOf('\n', start);
+        if (newlineIndex < 0) {
+            _programIndex = _programText.length() + 1;
+            line = _programText.substring(start);
+        } else {
+            _programIndex = newlineIndex + 1;
+            line = _programText.substring(start, newlineIndex);
+        }
+
+        _programLineNumber++;
+        line.replace("\r", "");
+        int hashIndex = line.indexOf('#');
+        int slashIndex = line.indexOf("//");
+        int commentIndex = -1;
+        if (hashIndex >= 0) commentIndex = hashIndex;
+        if (slashIndex >= 0 && (commentIndex < 0 || slashIndex < commentIndex)) commentIndex = slashIndex;
+        if (commentIndex >= 0) line = line.substring(0, commentIndex);
+        line.trim();
+
+        if (line.length() > 0) {
+            lineNumber = _programLineNumber;
+            return true;
+        }
+    }
+    return false;
+}
+
+bool WebServerManager::parseProgramLine(String line, ProgramCommand& command, String& error) {
+    command.type = PROGRAM_CMD_NONE;
+    command.motor = 0;
+    command.value = 0;
+    command.relay = 0;
+    command.relayOn = false;
+    command.delayMs = 0;
+
+    int spaceIndex = line.indexOf(' ');
+    if (spaceIndex < 0) spaceIndex = line.indexOf('\t');
+    String op = (spaceIndex < 0) ? line : line.substring(0, spaceIndex);
+    String arg = (spaceIndex < 0) ? "" : line.substring(spaceIndex + 1);
+    op.trim();
+    arg.trim();
+    op.toUpperCase();
+
+    if (op == "X" || op == "Y" || op == "VX" || op == "VY") {
+        if (arg.length() == 0) {
+            error = (op == "VX" || op == "VY") ? "Missing speed value." : "Missing movement value.";
+            return false;
+        }
+        char* endPtr = nullptr;
+        float value = strtof(arg.c_str(), &endPtr);
+        while (endPtr && (*endPtr == ' ' || *endPtr == '\t')) endPtr++;
+        if (!endPtr || endPtr == arg.c_str() || *endPtr != '\0') {
+            error = (op == "VX" || op == "VY") ? "Speed value must be a number." : "Movement value must be a number.";
+            return false;
+        }
+        if (op == "VX" || op == "VY") {
+            if (value < 1.0f || value > 200000.0f) {
+                error = "Speed must be between 1 and 200000 steps/s.";
+                return false;
+            }
+            command.type = PROGRAM_CMD_SPEED;
+            command.motor = (op == "VX") ? 1 : 2;
+        } else {
+            command.type = PROGRAM_CMD_MOVE;
+            command.motor = (op == "X") ? 1 : 2;
+        }
+        command.value = value;
+        return true;
+    }
+
+    if (op == "D" || op == "WAIT") {
+        if (arg.length() == 0) {
+            error = "Missing delay value.";
+            return false;
+        }
+        char* endPtr = nullptr;
+        long delayMs = strtol(arg.c_str(), &endPtr, 10);
+        while (endPtr && (*endPtr == ' ' || *endPtr == '\t')) endPtr++;
+        if (!endPtr || endPtr == arg.c_str() || *endPtr != '\0') {
+            error = "Delay value must be an integer in milliseconds.";
+            return false;
+        }
+        if (delayMs < 0 || delayMs > 3600000L) {
+            error = "Delay must be between 0 and 3600000 ms.";
+            return false;
+        }
+        command.type = PROGRAM_CMD_DELAY;
+        command.delayMs = (uint32_t)delayMs;
+        return true;
+    }
+
+    if (op == "GEN1" || op == "GEN2" || op == "R1" || op == "R2") {
+        arg.toUpperCase();
+        if (arg != "ON" && arg != "OFF") {
+            error = "Gen output command must be ON or OFF.";
+            return false;
+        }
+        command.type = PROGRAM_CMD_RELAY;
+        command.relay = (op == "GEN1" || op == "R1") ? 1 : 2;
+        command.relayOn = (arg == "ON");
+        return true;
+    }
+
+    error = "Unknown command.";
+    return false;
+}
+
+void WebServerManager::setProgramStatus(const String& status) {
+    _programStatus = status;
 }
 
 String WebServerManager::getTelemetryJson() {
@@ -522,6 +756,9 @@ String WebServerManager::getTelemetryJson() {
     doc["r2Active"] = _r2.isActive();
     doc["r2Remaining"] = _r2.getRemainingSeconds();
     doc["r2Pin"] = _r2.getPin();
+    doc["programRunning"] = _programRunning;
+    doc["programStatus"] = _programStatus;
+    doc["programLine"] = _programCurrentLineText;
     
     if (_hasPendingLog) {
         doc["log"] = _pendingLog;

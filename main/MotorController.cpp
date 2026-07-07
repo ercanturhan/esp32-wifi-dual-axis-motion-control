@@ -221,6 +221,15 @@ void MotorController::updateConfig(const MotorConfig& newConfig) {
     applySpeedProfile();
 }
 
+bool MotorController::setRuntimeSpeed(float speedStepsPerSecond) {
+    if (!_stepper) return false;
+    if (speedStepsPerSecond < 1.0f || speedStepsPerSecond > 200000.0f) return false;
+
+    _config.maxSpeed = speedStepsPerSecond;
+    _stepper->setSpeedInHz((uint32_t)round(speedStepsPerSecond));
+    return true;
+}
+
 long MotorController::getCurrentPosition() const {
     return _stepper ? _stepper->getCurrentPosition() : 0;
 }

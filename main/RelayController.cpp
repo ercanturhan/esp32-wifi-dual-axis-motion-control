@@ -17,6 +17,7 @@ void RelayController::begin(int id, int pin, bool activeHigh) {
 
 void RelayController::update() {
     if (!_active) return;
+    if (_durationMs == 0) return;
 
     if (millis() - _startedAt >= _durationMs) {
         turnOff();
@@ -30,6 +31,13 @@ void RelayController::trigger(uint32_t durationSeconds) {
     }
 
     _durationMs = durationSeconds * 1000UL;
+    _startedAt = millis();
+    _active = true;
+    writeRelay(true);
+}
+
+void RelayController::turnOn() {
+    _durationMs = 0;
     _startedAt = millis();
     _active = true;
     writeRelay(true);

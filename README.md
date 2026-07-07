@@ -1,6 +1,6 @@
 # ESP32 WiFi Dual Axis Stepper Motor Control
 
-ESP32 firmware for controlling two stepper motors with DRV8825 drivers from an embedded WiFi web dashboard. The interface provides live WebSocket telemetry, absolute movement, jog movement, homing, driver enable control, Wi-Fi configuration, and two timed relay outputs.
+ESP32 firmware for controlling two stepper motors with DRV8825 drivers from an embedded WiFi web dashboard. The interface provides live WebSocket telemetry, absolute movement, jog movement, homing, driver enable control, Wi-Fi configuration, and two timed general outputs.
 
 ![Dashboard preview](docs/dashboard-preview.png)
 
@@ -13,7 +13,7 @@ ESP32 firmware for controlling two stepper motors with DRV8825 drivers from an e
 - Position units: pulses, mm, cm, or degrees.
 - Wireless control through ESP32 AP mode and optional STA mode on an existing Wi-Fi network.
 - WebSocket dashboard telemetry at about 5 Hz.
-- Timed relay output control from the dashboard.
+- Timed Gen.Out1 and Gen.Out2 control from the dashboard.
 - NVS storage for motor settings, Wi-Fi credentials, and last known positions.
 - Task watchdog enabled in the main loop.
 
@@ -37,14 +37,14 @@ All signal grounds must be common: ESP32 GND, DRV8825 GND, relay module GND, and
 | Motor 2 M0 | GPIO16 | DRV8825 M0 |
 | Motor 2 M1 | GPIO17 | DRV8825 M1 |
 | Motor 2 M2 | GPIO22 | DRV8825 M2 |
-| Relay 1 signal | GPIO23 | Relay module IN1 or transistor driver input |
-| Relay 2 signal | GPIO5 | Relay module IN2 or transistor driver input |
+| Gen.Out1 signal | GPIO23 | Relay module IN1 or transistor driver input |
+| Gen.Out2 signal | GPIO5 | Relay module IN2 or transistor driver input |
 
 GPIO5 is usable as a relay output on common ESP32 DevKit boards, but it is also a boot strapping pin. Make sure the relay input does not pull GPIO5 into the wrong state during reset. If your relay board affects boot, change `RELAY2_PIN` in `main/Config.h` to another safe free output pin.
 
-## Relay Output Behavior
+## General Output Behavior
 
-Relay outputs are defined in `main/Config.h`:
+General outputs are defined in `main/Config.h`:
 
 ```cpp
 #define RELAY1_PIN     23
@@ -52,7 +52,7 @@ Relay outputs are defined in `main/Config.h`:
 #define RELAY_ACTIVE_HIGH true
 ```
 
-With the default `RELAY_ACTIVE_HIGH true`, the GPIO goes HIGH while the relay timer is active and LOW when the timer expires. For active-low relay modules, set `RELAY_ACTIVE_HIGH` to `false`.
+With the default `RELAY_ACTIVE_HIGH true`, the GPIO goes HIGH while the output timer is active and LOW when the timer expires. For active-low relay modules, set `RELAY_ACTIVE_HIGH` to `false`.
 
 Do not connect relay coils directly to ESP32 GPIO pins. Use a relay module with proper driver circuitry or add a transistor, flyback diode, and a suitable relay supply.
 
@@ -72,10 +72,40 @@ The Dashboard tab contains:
 - Absolute move controls.
 - Jog buttons.
 - Home, Set Zero, Enable Driver, and Disable Driver buttons.
-- Timed Relay Outputs for Relay 1 and Relay 2.
+- Timed General Outputs for Gen.Out1 and Gen.Out2.
 - System information and log output.
 
-To use a relay, enter the on-time in seconds and press `Trigger Relay 1` or `Trigger Relay 2`. The firmware starts the countdown immediately and turns the output off automatically when the timer reaches zero. The `Turn Off` button cancels the timer manually.
+To use a general output, enter the on-time in seconds and press `Trigger Gen.Out1` or `Trigger Gen.Out2`. The firmware starts the countdown immediately and turns the output off automatically when the timer reaches zero. The `Turn Off` button cancels the timer manually.
+
+## Sequential Program Tab
+
+The Program tab can run a simple line-by-line text program from the web dashboard. Existing manual motor and general output controls remain available.
+
+Each line contains one command:
+
+```text
+VX 5000
+VY 5000
+X 50
+Y 10
+D 50
+Gen1 ON
+D 100
+X -50
+Gen2 OFF
+D 200
+Gen1 OFF
+```
+
+- `X <value>` moves Motor 1 / X axis by a relative amount.
+- `Y <value>` moves Motor 2 / Y axis by a relative amount.
+- `VX <steps/s>` changes Motor 1 / X axis runtime speed.
+- `VY <steps/s>` changes Motor 2 / Y axis runtime speed.
+- `D <milliseconds>` waits before running the next line.
+- `Gen1 ON`, `Gen1 OFF`, `Gen2 ON`, and `Gen2 OFF` switch Gen.Out1 and Gen.Out2 directly.
+- Empty lines are ignored. Comments can start with `#` or `//`.
+
+Movement values use the currently selected motor unit from Motor Settings: pulse, mm, cm, or degree. The firmware waits for a motor move to finish before it advances to the next line.
 
 ## Motor Setup
 

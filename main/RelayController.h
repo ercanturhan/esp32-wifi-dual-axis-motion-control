@@ -10,6 +10,7 @@ public:
     void begin(int id, int pin, bool activeHigh);
     void update();
     void trigger(uint32_t durationSeconds);
+    void turnOn();
     void turnOff();
 
     int getId() const { return _id; }

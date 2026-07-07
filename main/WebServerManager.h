@@ -27,6 +27,23 @@ public:
     void queueLog(const String& message);
 
 private:
+    enum ProgramCommandType {
+        PROGRAM_CMD_NONE = 0,
+        PROGRAM_CMD_MOVE,
+        PROGRAM_CMD_SPEED,
+        PROGRAM_CMD_DELAY,
+        PROGRAM_CMD_RELAY
+    };
+
+    struct ProgramCommand {
+        ProgramCommandType type;
+        int motor;
+        float value;
+        int relay;
+        bool relayOn;
+        uint32_t delayMs;
+    };
+
     StorageManager& _storage;
     MotorController& _m1;
     MotorController& _m2;
@@ -39,6 +56,17 @@ private:
     unsigned long _lastBroadcastTime;
     String _pendingLog;
     bool _hasPendingLog;
+
+    String _programText;
+    String _programStatus;
+    String _programCurrentLineText;
+    bool _programRunning;
+    size_t _programIndex;
+    int _programLineNumber;
+    int _programWaitingMotor;
+    bool _programDelayActive;
+    unsigned long _programDelayStartedAt;
+    uint32_t _programDelayMs;
     
     WifiConfig _wifiConfig;
     
@@ -46,6 +74,12 @@ private:
     void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len);
     void handleWebSocketMessage(void *arg, uint8_t *data, size_t len, AsyncWebSocketClient *client);
     void processJsonCommand(JsonDocument& doc, AsyncWebSocketClient *client);
+    void startProgram(const String& programText);
+    void stopProgram(bool stopOutputs);
+    void updateProgram();
+    bool readNextProgramLine(String& line, int& lineNumber);
+    bool parseProgramLine(String line, ProgramCommand& command, String& error);
+    void setProgramStatus(const String& status);
     
     // Telemetry generation
     String getTelemetryJson();
