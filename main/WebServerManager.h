@@ -15,7 +15,8 @@
 class WebServerManager {
 public:
     WebServerManager(StorageManager& storage, MotorController& m1, MotorController& m2,
-                     RelayController& r1, RelayController& r2);
+                     RelayController& r1, RelayController& r2,
+                     RelayController& programR1, RelayController& programR2, RelayController& programR3);
     
     void begin();
     void update();
@@ -32,6 +33,7 @@ private:
         PROGRAM_CMD_MOVE,
         PROGRAM_CMD_SPEED,
         PROGRAM_CMD_DELAY,
+        PROGRAM_CMD_GEN_OUTPUT,
         PROGRAM_CMD_RELAY
     };
 
@@ -49,6 +51,9 @@ private:
     MotorController& _m2;
     RelayController& _r1;
     RelayController& _r2;
+    RelayController& _programR1;
+    RelayController& _programR2;
+    RelayController& _programR3;
     
     AsyncWebServer _server;
     AsyncWebSocket _ws;

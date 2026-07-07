@@ -1,0 +1,7 @@
+.vscode/
+.idea/
+build/
+dist/
+*.tmp
+*.log
+*.bak

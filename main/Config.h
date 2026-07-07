@@ -26,6 +26,11 @@
 #define RELAY2_PIN     5
 #define RELAY_ACTIVE_HIGH true
 
+// Program-controlled relay output pins
+#define PROGRAM_RELAY1_PIN 2
+#define PROGRAM_RELAY2_PIN 12
+#define PROGRAM_RELAY3_PIN 15
+
 // AP WiFi Defaults
 #define AP_SSID "ESP32-MOTOR"
 #define AP_PASS "12345678"

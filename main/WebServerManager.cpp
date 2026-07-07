@@ -1,8 +1,10 @@
 #include "WebServerManager.h"
 
 WebServerManager::WebServerManager(StorageManager& storage, MotorController& m1, MotorController& m2,
-                                   RelayController& r1, RelayController& r2)
-    : _storage(storage), _m1(m1), _m2(m2), _r1(r1), _r2(r2), _server(80), _ws("/ws"),
+                                   RelayController& r1, RelayController& r2,
+                                   RelayController& programR1, RelayController& programR2, RelayController& programR3)
+    : _storage(storage), _m1(m1), _m2(m2), _r1(r1), _r2(r2),
+      _programR1(programR1), _programR2(programR2), _programR3(programR3), _server(80), _ws("/ws"),
       _lastBroadcastTime(0), _hasPendingLog(false),
       _programStatus("Stopped"),
       _programRunning(false), _programIndex(0), _programLineNumber(0), _programWaitingMotor(0),
@@ -177,6 +179,9 @@ void WebServerManager::setupRoutes() {
         _m2.stop();
         _r1.turnOff();
         _r2.turnOff();
+        _programR1.turnOff();
+        _programR2.turnOff();
+        _programR3.turnOff();
         queueLog("Emergency stop received by REST.");
         request->send(200, "application/json", "{\"status\":\"ok\"}");
     });
@@ -336,6 +341,9 @@ void WebServerManager::processJsonCommand(JsonDocument& doc, AsyncWebSocketClien
         _m2.stop();
         _r1.turnOff();
         _r2.turnOff();
+        _programR1.turnOff();
+        _programR2.turnOff();
+        _programR3.turnOff();
         queueLog("Emergency stop received.");
     }
     else if (cmd == "relay_trigger") {
@@ -470,6 +478,9 @@ void WebServerManager::stopProgram(bool stopOutputs) {
         _m2.stop();
         _r1.turnOff();
         _r2.turnOff();
+        _programR1.turnOff();
+        _programR2.turnOff();
+        _programR3.turnOff();
     }
     setProgramStatus("Stopped");
 }
@@ -537,11 +548,20 @@ void WebServerManager::updateProgram() {
         _programDelayStartedAt = millis();
         _programDelayMs = command.delayMs;
         queueLog("Program line " + String(lineNumber) + ": wait " + String(command.delayMs) + " ms.");
-    } else if (command.type == PROGRAM_CMD_RELAY) {
+    } else if (command.type == PROGRAM_CMD_GEN_OUTPUT) {
         RelayController& relay = (command.relay == 1) ? _r1 : _r2;
         if (command.relayOn) relay.turnOn();
         else relay.turnOff();
         queueLog("Program line " + String(lineNumber) + ": Gen.Out" + String(command.relay) + (command.relayOn ? " ON." : " OFF."));
+    } else if (command.type == PROGRAM_CMD_RELAY) {
+        RelayController* relay = nullptr;
+        if (command.relay == 1) relay = &_programR1;
+        else if (command.relay == 2) relay = &_programR2;
+        else relay = &_programR3;
+
+        if (command.relayOn) relay->turnOn();
+        else relay->turnOff();
+        queueLog("Program line " + String(lineNumber) + ": R" + String(command.relay) + (command.relayOn ? " ON." : " OFF."));
     }
 }
 
@@ -639,14 +659,26 @@ bool WebServerManager::parseProgramLine(String line, ProgramCommand& command, St
         return true;
     }
 
-    if (op == "GEN1" || op == "GEN2" || op == "R1" || op == "R2") {
+    if (op == "GEN1" || op == "GEN2") {
         arg.toUpperCase();
         if (arg != "ON" && arg != "OFF") {
             error = "Gen output command must be ON or OFF.";
             return false;
         }
+        command.type = PROGRAM_CMD_GEN_OUTPUT;
+        command.relay = (op == "GEN1") ? 1 : 2;
+        command.relayOn = (arg == "ON");
+        return true;
+    }
+
+    if (op == "R1" || op == "R2" || op == "R3") {
+        arg.toUpperCase();
+        if (arg != "ON" && arg != "OFF") {
+            error = "Relay command must be ON or OFF.";
+            return false;
+        }
         command.type = PROGRAM_CMD_RELAY;
-        command.relay = (op == "GEN1" || op == "R1") ? 1 : 2;
+        command.relay = op.substring(1).toInt();
         command.relayOn = (arg == "ON");
         return true;
     }
@@ -663,7 +695,7 @@ String WebServerManager::getTelemetryJson() {
     #if ARDUINOJSON_VERSION_MAJOR >= 7
         JsonDocument doc;
     #else
-        DynamicJsonDocument doc(2048);
+        DynamicJsonDocument doc(3072);
     #endif
     
     // Motor 1 status
@@ -756,6 +788,12 @@ String WebServerManager::getTelemetryJson() {
     doc["r2Active"] = _r2.isActive();
     doc["r2Remaining"] = _r2.getRemainingSeconds();
     doc["r2Pin"] = _r2.getPin();
+    doc["relayR1Active"] = _programR1.isActive();
+    doc["relayR1Pin"] = _programR1.getPin();
+    doc["relayR2Active"] = _programR2.isActive();
+    doc["relayR2Pin"] = _programR2.getPin();
+    doc["relayR3Active"] = _programR3.isActive();
+    doc["relayR3Pin"] = _programR3.getPin();
     doc["programRunning"] = _programRunning;
     doc["programStatus"] = _programStatus;
     doc["programLine"] = _programCurrentLineText;

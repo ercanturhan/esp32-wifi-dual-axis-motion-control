@@ -15,7 +15,10 @@ MotorController motor1;
 MotorController motor2;
 RelayController relay1;
 RelayController relay2;
-WebServerManager webServer(storage, motor1, motor2, relay1, relay2);
+RelayController programRelay1;
+RelayController programRelay2;
+RelayController programRelay3;
+WebServerManager webServer(storage, motor1, motor2, relay1, relay2, programRelay1, programRelay2, programRelay3);
 
 // Configuration copies
 MotorConfig m1Cfg;
@@ -70,11 +73,17 @@ void setup() {
     motor2.setEnableTimeout(sysCfg.enableTimeoutActive, sysCfg.enableTimeoutDuration);
     Serial.println("Motor controllers initialized and coordinates restored.");
 
-    // 6. Initialize timed relay outputs
+    // 6. Initialize timed general outputs and program-controlled relays
     relay1.begin(1, RELAY1_PIN, RELAY_ACTIVE_HIGH);
     relay2.begin(2, RELAY2_PIN, RELAY_ACTIVE_HIGH);
-    Serial.printf("Relay 1 initialized on GPIO%d.\n", RELAY1_PIN);
-    Serial.printf("Relay 2 initialized on GPIO%d.\n", RELAY2_PIN);
+    programRelay1.begin(1, PROGRAM_RELAY1_PIN, RELAY_ACTIVE_HIGH);
+    programRelay2.begin(2, PROGRAM_RELAY2_PIN, RELAY_ACTIVE_HIGH);
+    programRelay3.begin(3, PROGRAM_RELAY3_PIN, RELAY_ACTIVE_HIGH);
+    Serial.printf("Gen.Out1 initialized on GPIO%d.\n", RELAY1_PIN);
+    Serial.printf("Gen.Out2 initialized on GPIO%d.\n", RELAY2_PIN);
+    Serial.printf("Program relay R1 initialized on GPIO%d.\n", PROGRAM_RELAY1_PIN);
+    Serial.printf("Program relay R2 initialized on GPIO%d.\n", PROGRAM_RELAY2_PIN);
+    Serial.printf("Program relay R3 initialized on GPIO%d.\n", PROGRAM_RELAY3_PIN);
 
     // 7. Initialize Web server and AP+STA Wi-Fi
     webServer.begin();
@@ -103,9 +112,12 @@ void loop() {
     motor1.update();
     motor2.update();
 
-    // 3. Update timed relay outputs
+    // 3. Update timed general outputs and program-controlled relays
     relay1.update();
     relay2.update();
+    programRelay1.update();
+    programRelay2.update();
+    programRelay3.update();
 
     // 4. Update Web Server events & WebSocket Broadcasts
     webServer.update();

@@ -814,10 +814,17 @@ X 50
 Y 10
 D 50
 Gen1 ON
+R1 ON
 D 100
 X -50
 Gen2 OFF
+R2 ON
 D 200
+R1 OFF
+R2 OFF
+R3 ON
+D 100
+R3 OFF
 Gen1 OFF</textarea>
                 </div>
 
@@ -840,8 +847,31 @@ Gen1 OFF</textarea>
                     <div><code>D 100</code> waits 100 milliseconds before the next line.</div>
                     <div><code>Gen1 ON</code> turns Gen.Out1 on until another command turns it off.</div>
                     <div><code>Gen2 OFF</code> turns Gen.Out2 off.</div>
+                    <div><code>R1 ON</code> turns the R1 relay output on.</div>
+                    <div><code>R2 OFF</code> turns the R2 relay output off.</div>
+                    <div><code>R3 ON</code> turns the R3 relay output on.</div>
                     <div>Use <code>#</code> or <code>//</code> for comments. Empty lines are ignored.</div>
                     <div>The movement unit is the unit selected in Motor Settings: mm, cm, degree, or pulse.</div>
+                </div>
+            </article>
+
+            <article class="card">
+                <div class="card-title">
+                    <h2>Program Relay Outputs</h2>
+                </div>
+                <div class="program-status">
+                    <div class="stat-box">
+                        <span class="stat-label">R1 GPIO<span id="relay-r1-pin"></span></span>
+                        <span class="stat-value"><span id="relay-r1-ind" class="indicator"></span> <span id="relay-r1-state">Off</span></span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-label">R2 GPIO<span id="relay-r2-pin"></span></span>
+                        <span class="stat-value"><span id="relay-r2-ind" class="indicator"></span> <span id="relay-r2-state">Off</span></span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-label">R3 GPIO<span id="relay-r3-pin"></span></span>
+                        <span class="stat-value"><span id="relay-r3-ind" class="indicator"></span> <span id="relay-r3-state">Off</span></span>
+                    </div>
                 </div>
             </article>
         </div>
@@ -920,6 +950,7 @@ Gen1 OFF</textarea>
             updateRelayTelemetry(1, data.r1Active, data.r1Remaining);
             updateRelayTelemetry(2, data.r2Active, data.r2Remaining);
             updateProgramTelemetry(data);
+            updateProgramRelayTelemetry(data);
 
             if (data.log) {
                 const isWarn = data.log.includes("Error") || data.log.includes("limit") || data.log.includes("Emergency");
@@ -997,6 +1028,19 @@ Gen1 OFF</textarea>
 
             status.innerText = data.programStatus || "Stopped";
             line.innerText = data.programLine || "-";
+        }
+
+        function updateProgramRelayTelemetry(data) {
+            updateProgramRelayStatus(1, data.relayR1Active, data.relayR1Pin);
+            updateProgramRelayStatus(2, data.relayR2Active, data.relayR2Pin);
+            updateProgramRelayStatus(3, data.relayR3Active, data.relayR3Pin);
+        }
+
+        function updateProgramRelayStatus(relayId, active, pin) {
+            if (active === undefined) return;
+            updateIndicator("relay-r" + relayId + "-ind", active);
+            document.getElementById("relay-r" + relayId + "-state").innerText = active ? "On" : "Off";
+            if (pin !== undefined) document.getElementById("relay-r" + relayId + "-pin").innerText = pin;
         }
 
         function populateConfigFields(data) {
@@ -1235,13 +1279,7 @@ Gen1 OFF</textarea>
 
         window.addEventListener("load", function() {
             const savedProgram = localStorage.getItem("motionProgramText");
-            if (savedProgram) {
-                const migratedProgram = savedProgram
-                    .replace(/^R1\s+/gmi, "Gen1 ")
-                    .replace(/^R2\s+/gmi, "Gen2 ");
-                document.getElementById("program-editor").value = migratedProgram;
-                if (migratedProgram !== savedProgram) localStorage.setItem("motionProgramText", migratedProgram);
-            }
+            if (savedProgram) document.getElementById("program-editor").value = savedProgram;
             initWebSocket();
         });
     </script>
