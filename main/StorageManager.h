@@ -21,6 +21,10 @@ public:
     bool loadSystemConfig(SystemConfig& config);
     bool saveSystemConfig(const SystemConfig& config);
 
+    // Sequential program text used by the web Program tab and physical start button
+    bool loadProgramText(String& programText);
+    bool saveProgramText(const String& programText);
+
     // Save Motor Positions specifically
     bool savePositions(long pos1, long pos2);
 

@@ -30,6 +30,37 @@ unsigned long lastMoveTime = 0;
 long lastSavedPos1 = 0;
 long lastSavedPos2 = 0;
 
+// Physical Program Start button debounce tracker
+bool lastProgramButtonReading = false;
+bool stableProgramButtonPressed = false;
+unsigned long lastProgramButtonChangeAt = 0;
+
+bool readProgramStartButtonPressed() {
+    bool rawState = digitalRead(PROGRAM_START_BUTTON_PIN);
+    return PROGRAM_START_BUTTON_ACTIVE_LOW ? !rawState : rawState;
+}
+
+void updateProgramStartButton() {
+    bool reading = readProgramStartButtonPressed();
+    unsigned long now = millis();
+
+    if (reading != lastProgramButtonReading) {
+        lastProgramButtonReading = reading;
+        lastProgramButtonChangeAt = now;
+    }
+
+    if ((now - lastProgramButtonChangeAt) < PROGRAM_START_BUTTON_DEBOUNCE_MS) {
+        return;
+    }
+
+    if (reading != stableProgramButtonPressed) {
+        stableProgramButtonPressed = reading;
+        if (stableProgramButtonPressed) {
+            webServer.startSavedProgramFromButton();
+        }
+    }
+}
+
 void setup() {
     // 1. Initialize Serial
     Serial.begin(115200);
@@ -85,11 +116,18 @@ void setup() {
     Serial.printf("Program relay R2 initialized on GPIO%d.\n", PROGRAM_RELAY2_PIN);
     Serial.printf("Program relay R3 initialized on GPIO%d.\n", PROGRAM_RELAY3_PIN);
 
-    // 7. Initialize Web server and AP+STA Wi-Fi
+    // 7. Initialize physical Program Start button
+    pinMode(PROGRAM_START_BUTTON_PIN, INPUT);
+    lastProgramButtonReading = readProgramStartButtonPressed();
+    stableProgramButtonPressed = lastProgramButtonReading;
+    lastProgramButtonChangeAt = millis();
+    Serial.printf("Physical Program Start button initialized on GPIO%d. Use external pull-up.\n", PROGRAM_START_BUTTON_PIN);
+
+    // 8. Initialize Web server and AP+STA Wi-Fi
     webServer.begin();
     webServer.queueLog("System loaded successfully.");
 
-    // 8. Initialize Task Watchdog (10 seconds timeout)
+    // 9. Initialize Task Watchdog (10 seconds timeout)
     Serial.println("Configuring Task Watchdog...");
     #if ESP_IDF_VERSION_MAJOR >= 5
         esp_task_wdt_config_t wdt_config;
@@ -119,10 +157,13 @@ void loop() {
     programRelay2.update();
     programRelay3.update();
 
-    // 4. Update Web Server events & WebSocket Broadcasts
+    // 4. Update physical Program Start button
+    updateProgramStartButton();
+
+    // 5. Update Web Server events & WebSocket Broadcasts
     webServer.update();
 
-    // 5. Smart NVS Position Auto-Save
+    // 6. Smart NVS Position Auto-Save
     long currPos1 = motor1.getCurrentPosition();
     long currPos2 = motor2.getCurrentPosition();
 

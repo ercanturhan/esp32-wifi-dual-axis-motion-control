@@ -14,7 +14,8 @@ ESP32 firmware for controlling two stepper motors with DRV8825 drivers from an e
 - WebSocket dashboard telemetry at about 5 Hz.
 - Timed Gen.Out1 and Gen.Out2 control from the dashboard.
 - Program-controlled R1, R2, and R3 relay outputs.
-- NVS storage for motor settings, Wi-Fi credentials, and last known positions.
+- Physical Program Start button input on GPIO34.
+- NVS storage for motor settings, Wi-Fi credentials, saved Program tab text, and last known positions.
 - Task watchdog enabled in the main loop.
 
 ## Hardware Connections
@@ -42,8 +43,11 @@ All signal grounds must be common: ESP32 GND, DRV8825 GND, relay module GND, and
 | R1 relay signal | GPIO2 | Relay module input or transistor driver input |
 | R2 relay signal | GPIO12 | Relay module input or transistor driver input |
 | R3 relay signal | GPIO15 | Relay module input or transistor driver input |
+| Program Start button | GPIO34 | Momentary button to GND with external 10k pull-up to 3.3V |
 
 GPIO5, GPIO2, GPIO12, and GPIO15 are usable as outputs on common ESP32 DevKit boards, but they are also boot strapping pins. Make sure the relay inputs do not pull these GPIOs into the wrong state during reset. If your relay board affects boot, change the related pin definitions in `main/Config.h` to other safe free output pins.
+
+GPIO34 is input-only and does not provide an internal pull-up or pull-down resistor. Wire the Program Start button with an external 10k pull-up to 3.3V and connect the momentary button between GPIO34 and GND. Pressing the button starts the last saved Program tab text, the same sequence that the `Run Program` button starts.
 
 ## General Output Behavior
 
@@ -56,6 +60,7 @@ General outputs are defined in `main/Config.h`:
 #define PROGRAM_RELAY1_PIN 2
 #define PROGRAM_RELAY2_PIN 12
 #define PROGRAM_RELAY3_PIN 15
+#define PROGRAM_START_BUTTON_PIN 34
 ```
 
 With the default `RELAY_ACTIVE_HIGH true`, the GPIO goes HIGH while the output timer is active and LOW when the timer expires. For active-low relay modules, set `RELAY_ACTIVE_HIGH` to `false`.
@@ -100,6 +105,8 @@ Program tab:
 ## Sequential Program Tab
 
 The Program tab can run a simple line-by-line text program from the web dashboard. Existing manual motor and general output controls remain available. R1, R2, and R3 are separate program-controlled relay outputs.
+
+The editor text is saved to ESP32 NVS. Pressing `Run Program` starts the current editor text, and pressing the physical GPIO34 Program Start button starts the last saved editor text. If no program has been saved yet, the button press is ignored and an error is written to the web console.
 
 Each line contains one command:
 

@@ -31,6 +31,14 @@
 #define PROGRAM_RELAY2_PIN 12
 #define PROGRAM_RELAY3_PIN 15
 
+// Physical Program Start Button
+// GPIO34 is input-only and has no internal pull-up/down. Use an external 10k pull-up to 3.3V
+// and wire the button between GPIO34 and GND.
+#define PROGRAM_START_BUTTON_PIN 34
+#define PROGRAM_START_BUTTON_ACTIVE_LOW true
+#define PROGRAM_START_BUTTON_DEBOUNCE_MS 50
+#define PROGRAM_TEXT_MAX_LENGTH 4096
+
 // AP WiFi Defaults
 #define AP_SSID "ESP32-MOTOR"
 #define AP_PASS "12345678"

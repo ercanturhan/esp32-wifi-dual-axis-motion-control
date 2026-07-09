@@ -27,6 +27,9 @@ public:
     // Queue a message to be logged on the UI console
     void queueLog(const String& message);
 
+    // Starts the last saved Program tab text from a physical input button.
+    void startSavedProgramFromButton();
+
 private:
     enum ProgramCommandType {
         PROGRAM_CMD_NONE = 0,
@@ -63,6 +66,7 @@ private:
     bool _hasPendingLog;
 
     String _programText;
+    String _savedProgramText;
     String _programStatus;
     String _programCurrentLineText;
     bool _programRunning;
@@ -80,6 +84,7 @@ private:
     void handleWebSocketMessage(void *arg, uint8_t *data, size_t len, AsyncWebSocketClient *client);
     void processJsonCommand(JsonDocument& doc, AsyncWebSocketClient *client);
     void startProgram(const String& programText);
+    bool saveProgramText(const String& programText);
     void stopProgram(bool stopOutputs);
     void updateProgram();
     bool readNextProgramLine(String& line, int& lineNumber);

@@ -31,6 +31,13 @@ void WebServerManager::begin() {
     } else {
         Serial.println("No STA credentials configured. Operating in AP mode.");
     }
+
+    _storage.loadProgramText(_savedProgramText);
+    if (_savedProgramText.length() > 0) {
+        Serial.printf("Saved Program tab text loaded from NVS (%u bytes).\n", _savedProgramText.length());
+    } else {
+        Serial.println("No saved Program tab text found in NVS.");
+    }
     
     // 2. WebSocket Setup
     _ws.onEvent([this](AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len) {
@@ -262,7 +269,7 @@ void WebServerManager::handleWebSocketMessage(void *arg, uint8_t *data, size_t l
         #if ARDUINOJSON_VERSION_MAJOR >= 7
             JsonDocument doc;
         #else
-            DynamicJsonDocument doc(4096);
+        DynamicJsonDocument doc(6144);
         #endif
         DeserializationError error = deserializeJson(doc, (const uint8_t*)data, len);
         if (!error) {
@@ -374,6 +381,10 @@ void WebServerManager::processJsonCommand(JsonDocument& doc, AsyncWebSocketClien
         String programText = doc["program"] | "";
         startProgram(programText);
     }
+    else if (cmd == "program_save") {
+        String programText = doc["program"] | "";
+        saveProgramText(programText);
+    }
     else if (cmd == "program_stop") {
         stopProgram(true);
         queueLog("Program stopped by user.");
@@ -449,9 +460,20 @@ void WebServerManager::processJsonCommand(JsonDocument& doc, AsyncWebSocketClien
 }
 
 void WebServerManager::startProgram(const String& programText) {
+    if (programText.length() == 0) {
+        setProgramStatus("Error: empty program");
+        queueLog("Program could not start because the saved program text is empty.");
+        return;
+    }
+
     if (_m1.isRunning() || _m2.isRunning() || _m1.isHoming() || _m2.isHoming()) {
         setProgramStatus("Error: motors busy");
         queueLog("Program could not start because a motor is already moving.");
+        return;
+    }
+
+    if (!saveProgramText(programText)) {
+        setProgramStatus("Error: save failed");
         return;
     }
 
@@ -466,6 +488,35 @@ void WebServerManager::startProgram(const String& programText) {
     _programRunning = true;
     setProgramStatus("Running");
     queueLog("Program started.");
+}
+
+bool WebServerManager::saveProgramText(const String& programText) {
+    if (programText.length() > PROGRAM_TEXT_MAX_LENGTH) {
+        queueLog("Program text is too long. Maximum length is " + String(PROGRAM_TEXT_MAX_LENGTH) + " characters.");
+        return false;
+    }
+
+    if (programText == _savedProgramText) return true;
+
+    if (_storage.saveProgramText(programText)) {
+        _savedProgramText = programText;
+        Serial.printf("Program text saved to NVS (%u bytes).\n", _savedProgramText.length());
+        return true;
+    }
+
+    queueLog("Error: program text could not be saved to flash memory.");
+    return false;
+}
+
+void WebServerManager::startSavedProgramFromButton() {
+    if (_savedProgramText.length() == 0) {
+        setProgramStatus("Error: no saved program");
+        queueLog("Physical program start button pressed, but no Program tab text is saved.");
+        return;
+    }
+
+    queueLog("Physical program start button pressed.");
+    startProgram(_savedProgramText);
 }
 
 void WebServerManager::stopProgram(bool stopOutputs) {
@@ -695,7 +746,7 @@ String WebServerManager::getTelemetryJson() {
     #if ARDUINOJSON_VERSION_MAJOR >= 7
         JsonDocument doc;
     #else
-        DynamicJsonDocument doc(3072);
+        DynamicJsonDocument doc(3584);
     #endif
     
     // Motor 1 status
@@ -797,6 +848,8 @@ String WebServerManager::getTelemetryJson() {
     doc["programRunning"] = _programRunning;
     doc["programStatus"] = _programStatus;
     doc["programLine"] = _programCurrentLineText;
+    doc["programSavedLength"] = _savedProgramText.length();
+    doc["programStartButtonPin"] = PROGRAM_START_BUTTON_PIN;
     
     if (_hasPendingLog) {
         doc["log"] = _pendingLog;
@@ -812,7 +865,7 @@ String WebServerManager::getConfigJson() {
     #if ARDUINOJSON_VERSION_MAJOR >= 7
         JsonDocument doc;
     #else
-        DynamicJsonDocument doc(2048);
+        DynamicJsonDocument doc(8192);
     #endif
     
     doc["configUpdate"] = true;
@@ -850,6 +903,7 @@ String WebServerManager::getConfigJson() {
     
     doc["sysCfg"]["timeoutActive"] = sysCfg.enableTimeoutActive;
     doc["sysCfg"]["timeoutDuration"] = sysCfg.enableTimeoutDuration;
+    doc["savedProgramText"] = _savedProgramText;
     
     String output;
     serializeJson(doc, output);

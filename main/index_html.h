@@ -784,7 +784,7 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
                 <div class="card-title">
                     <div>
                         <h2>Sequential Program</h2>
-                        <div class="subtitle">Write one command per line. The ESP32 runs the lines in order and waits for each motor move to finish.</div>
+                        <div class="subtitle">Write one command per line. The ESP32 runs the saved text from this tab when Run Program or the GPIO34 start button is pressed.</div>
                     </div>
                     <span id="program-run-badge" class="badge badge-idle">Idle</span>
                 </div>
@@ -802,11 +802,15 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
                         <span class="stat-label">Mode</span>
                         <span class="stat-value" style="font-size:0.9rem">Relative</span>
                     </div>
+                    <div class="stat-box">
+                        <span class="stat-label">Saved Text</span>
+                        <span class="stat-value" id="program-saved-length" style="font-size:0.9rem">0 chars</span>
+                    </div>
                 </div>
 
                 <div class="input-group">
                     <label for="program-editor">Program Text</label>
-                    <textarea id="program-editor" spellcheck="false"># X and Y values are relative movement in the active motor unit
+                    <textarea id="program-editor" spellcheck="false" oninput="programEditorChanged()"># X and Y values are relative movement in the active motor unit
 # VX and VY values are speed in steps/s
 VX 5000
 VY 5000
@@ -850,6 +854,7 @@ Gen1 OFF</textarea>
                     <div><code>R1 ON</code> turns the R1 relay output on.</div>
                     <div><code>R2 OFF</code> turns the R2 relay output off.</div>
                     <div><code>R3 ON</code> turns the R3 relay output on.</div>
+                    <div><code>GPIO34</code> physical button starts the last saved program text.</div>
                     <div>Use <code>#</code> or <code>//</code> for comments. Empty lines are ignored.</div>
                     <div>The movement unit is the unit selected in Motor Settings: mm, cm, degree, or pulse.</div>
                 </div>
@@ -899,6 +904,7 @@ Gen1 OFF</textarea>
         let ws;
         const wsReconnectInterval = 2000;
         let activeTab = "dashboard";
+        let programSaveTimer = null;
 
         function initWebSocket() {
             const host = window.location.hostname || "192.168.4.1";
@@ -923,6 +929,21 @@ Gen1 OFF</textarea>
                 try {
                     const data = JSON.parse(evt.data);
                     if (data.configUpdate) {
+                        if (data.savedProgramText !== undefined) {
+                            const editor = document.getElementById("program-editor");
+                            const localProgram = localStorage.getItem("motionProgramText");
+                            const savedProgramText = String(data.savedProgramText || "");
+                            if (localProgram) {
+                                editor.value = localProgram;
+                                syncProgramTextToDevice(false);
+                            } else if (savedProgramText.length) {
+                                editor.value = data.savedProgramText;
+                                localStorage.setItem("motionProgramText", editor.value);
+                            } else {
+                                localStorage.setItem("motionProgramText", editor.value);
+                                syncProgramTextToDevice(false);
+                            }
+                        }
                         if (activeTab === "settings") populateConfigFields(data);
                         return;
                     }
@@ -1028,6 +1049,9 @@ Gen1 OFF</textarea>
 
             status.innerText = data.programStatus || "Stopped";
             line.innerText = data.programLine || "-";
+            if (data.programSavedLength !== undefined) {
+                document.getElementById("program-saved-length").innerText = data.programSavedLength + " chars";
+            }
         }
 
         function updateProgramRelayTelemetry(data) {
@@ -1207,6 +1231,22 @@ Gen1 OFF</textarea>
             localStorage.setItem("motionProgramText", editor.value);
             logConsole("Program sent to ESP32.");
             sendWsMsg({ cmd: "program_start", program: editor.value });
+        }
+
+        function programEditorChanged() {
+            const editor = document.getElementById("program-editor");
+            localStorage.setItem("motionProgramText", editor.value);
+            if (programSaveTimer) clearTimeout(programSaveTimer);
+            programSaveTimer = setTimeout(function() {
+                syncProgramTextToDevice(false);
+            }, 800);
+        }
+
+        function syncProgramTextToDevice(showLog) {
+            const editor = document.getElementById("program-editor");
+            if (!editor || !ws || ws.readyState !== WebSocket.OPEN) return;
+            sendWsMsg({ cmd: "program_save", program: editor.value });
+            if (showLog) logConsole("Program text saved to ESP32.");
         }
 
         function stopProgram() {
