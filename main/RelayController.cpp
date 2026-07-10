@@ -24,13 +24,13 @@ void RelayController::update() {
     }
 }
 
-void RelayController::trigger(uint32_t durationSeconds) {
-    if (durationSeconds == 0) {
+void RelayController::triggerMilliseconds(uint32_t durationMs) {
+    if (durationMs == 0) {
         turnOff();
         return;
     }
 
-    _durationMs = durationSeconds * 1000UL;
+    _durationMs = durationMs;
     _startedAt = millis();
     _active = true;
     writeRelay(true);
@@ -50,13 +50,14 @@ void RelayController::turnOff() {
     writeRelay(false);
 }
 
-uint32_t RelayController::getRemainingSeconds() const {
+uint32_t RelayController::getRemainingMilliseconds() const {
     if (!_active) return 0;
+    if (_durationMs == 0) return 0;
 
     unsigned long elapsed = millis() - _startedAt;
     if (elapsed >= _durationMs) return 0;
 
-    return (uint32_t)((_durationMs - elapsed + 999UL) / 1000UL);
+    return (uint32_t)(_durationMs - elapsed);
 }
 
 void RelayController::writeRelay(bool active) {

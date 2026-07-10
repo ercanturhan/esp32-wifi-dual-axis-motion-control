@@ -9,15 +9,15 @@ public:
 
     void begin(int id, int pin, bool activeHigh);
     void update();
-    void trigger(uint32_t durationSeconds);
+    void triggerMilliseconds(uint32_t durationMs);
     void turnOn();
     void turnOff();
 
     int getId() const { return _id; }
     int getPin() const { return _pin; }
     bool isActive() const { return _active; }
-    uint32_t getDurationSeconds() const { return _durationMs / 1000; }
-    uint32_t getRemainingSeconds() const;
+    uint32_t getDurationMilliseconds() const { return _durationMs; }
+    uint32_t getRemainingMilliseconds() const;
 
 private:
     int _id;

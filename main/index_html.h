@@ -139,15 +139,31 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
 
         .dashboard-grid {
             display: grid;
-            grid-template-columns: repeat(3, minmax(300px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(270px, max-content));
+            justify-content: start;
             align-items: stretch;
-            gap: 18px;
+            gap: 10px;
         }
 
         .settings-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(320px, 420px));
+            justify-content: start;
             gap: 18px;
+        }
+
+        .settings-card {
+            width: min(100%, 896px);
+        }
+
+        .settings-utility-card,
+        .settings-actions {
+            width: min(100%, 858px);
+        }
+
+        .settings-actions {
+            display: flex;
+            justify-content: flex-end;
         }
 
         .card {
@@ -163,6 +179,23 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
 
         .wide-card {
             grid-column: 1 / -1;
+        }
+
+        .dashboard-grid > .card {
+            width: min(100%, 295px);
+        }
+
+        .dashboard-grid > .relay-card {
+            width: min(100%, 295px);
+        }
+
+        .dashboard-grid > .dashboard-manual-relay {
+            grid-column: auto;
+            width: min(100%, 295px);
+        }
+
+        .dashboard-grid > .dashboard-system-card {
+            width: min(100%, 740px);
         }
 
         .card-title {
@@ -276,6 +309,53 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
             line-height: 1.45;
         }
 
+        .program-editor-shell {
+            display: grid;
+            grid-template-columns: 52px minmax(0, 1fr);
+            align-items: stretch;
+            min-height: 300px;
+        }
+
+        .program-line-numbers {
+            min-height: 300px;
+            overflow: hidden;
+            padding: 10px 8px 10px 4px;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-right: 0;
+            border-radius: 8px 0 0 8px;
+            color: var(--muted);
+            font-family: Consolas, monospace;
+            font-size: 0.93rem;
+            line-height: 1.45;
+            text-align: right;
+            user-select: none;
+        }
+
+        .program-line-number {
+            height: 1.45em;
+            padding-right: 4px;
+        }
+
+        .program-line-number.active {
+            color: #ffffff;
+            background: rgba(59, 130, 246, 0.45);
+            border-radius: 4px;
+            font-weight: 700;
+        }
+
+        #program-editor {
+            min-width: 0;
+            margin: 0;
+            border-radius: 0 8px 8px 0;
+            white-space: pre;
+            overflow: auto;
+        }
+
+        .program-editor-shell:focus-within .program-line-numbers {
+            border-color: var(--primary);
+        }
+
         input:focus,
         select:focus,
         textarea:focus {
@@ -307,9 +387,23 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
             grid-template-columns: 1fr;
         }
 
+        .dashboard-relay-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
+        }
+
+        .relay-test-actions {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 9px;
+            margin-top: 10px;
+        }
+
         .program-grid {
             display: grid;
-            grid-template-columns: minmax(360px, 1.35fr) minmax(300px, 0.8fr);
+            grid-template-columns: minmax(520px, 740px) minmax(300px, 420px);
+            justify-content: start;
             gap: 18px;
             align-items: start;
         }
@@ -404,7 +498,7 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
 
         @media (max-width: 1080px) {
             .dashboard-grid {
-                grid-template-columns: 1fr;
+                grid-template-columns: repeat(auto-fit, minmax(270px, max-content));
             }
             .program-grid {
                 grid-template-columns: 1fr;
@@ -424,8 +518,19 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
             }
             .stat-grid,
             .state-row,
-            .program-status {
+            .program-status,
+            .dashboard-relay-grid,
+            .relay-test-actions {
                 grid-template-columns: 1fr;
+            }
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+            .dashboard-grid > .card,
+            .dashboard-grid > .relay-card,
+            .dashboard-grid > .dashboard-manual-relay,
+            .dashboard-grid > .dashboard-system-card {
+                width: 100%;
             }
         }
     </style>
@@ -592,7 +697,7 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
                 <div class="card-title">
                     <div>
                         <h2>Timed General Outputs</h2>
-                        <div class="subtitle">Gen.Out1 uses GPIO23. Gen.Out2 uses GPIO5. The output turns off automatically when the timer expires.</div>
+                        <div class="subtitle">Gen.Out1 uses GPIO23. Gen.Out2 uses GPIO5. Timed output duration is entered and counted in milliseconds.</div>
                     </div>
                 </div>
                 <div class="relay-grid">
@@ -603,12 +708,12 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
                         </div>
                         <div class="stat-grid">
                             <div class="input-group">
-                                <label for="r1-duration">On Time (seconds)</label>
-                                <input type="number" id="r1-duration" min="1" max="86400" value="5">
+                                <label for="r1-duration">On Time (ms)</label>
+                                <input type="number" id="r1-duration" min="1" max="86400000" value="5000">
                             </div>
                             <div class="stat-box">
                                 <span class="stat-label">Remaining</span>
-                                <span class="stat-value"><span id="r1-remaining">0</span><span class="stat-unit">s</span></span>
+                                <span class="stat-value"><span id="r1-remaining">0</span><span class="stat-unit">ms</span></span>
                             </div>
                         </div>
                         <div class="button-row" style="margin-top:10px">
@@ -624,12 +729,12 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
                         </div>
                         <div class="stat-grid">
                             <div class="input-group">
-                                <label for="r2-duration">On Time (seconds)</label>
-                                <input type="number" id="r2-duration" min="1" max="86400" value="5">
+                                <label for="r2-duration">On Time (ms)</label>
+                                <input type="number" id="r2-duration" min="1" max="86400000" value="5000">
                             </div>
                             <div class="stat-box">
                                 <span class="stat-label">Remaining</span>
-                                <span class="stat-value"><span id="r2-remaining">0</span><span class="stat-unit">s</span></span>
+                                <span class="stat-value"><span id="r2-remaining">0</span><span class="stat-unit">ms</span></span>
                             </div>
                         </div>
                         <div class="button-row" style="margin-top:10px">
@@ -640,7 +745,57 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
                 </div>
             </article>
 
-            <article class="card wide-card">
+            <article class="card wide-card dashboard-manual-relay">
+                <div class="card-title">
+                    <div>
+                        <h2>Program Relay Manual Test</h2>
+                        <div class="subtitle">Direct ON/OFF controls for R1, R2, and R3. These are the same outputs used by Program commands.</div>
+                    </div>
+                </div>
+                <div class="dashboard-relay-grid">
+                    <div class="stat-box">
+                        <div class="card-title" style="border:0;padding:0;margin-bottom:8px">
+                            <div>
+                                <h3>R1</h3>
+                                <span class="stat-label">GPIO<span id="dashboard-relay-r1-pin">2</span></span>
+                            </div>
+                            <span class="status-badge"><span id="dashboard-relay-r1-ind" class="indicator"></span><span id="dashboard-relay-r1-state">Off</span></span>
+                        </div>
+                        <div class="relay-test-actions">
+                            <button class="btn btn-success" onclick="setProgramRelay(1, true)">Turn On</button>
+                            <button class="btn btn-danger" onclick="setProgramRelay(1, false)">Turn Off</button>
+                        </div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="card-title" style="border:0;padding:0;margin-bottom:8px">
+                            <div>
+                                <h3>R2</h3>
+                                <span class="stat-label">GPIO<span id="dashboard-relay-r2-pin">12</span></span>
+                            </div>
+                            <span class="status-badge"><span id="dashboard-relay-r2-ind" class="indicator"></span><span id="dashboard-relay-r2-state">Off</span></span>
+                        </div>
+                        <div class="relay-test-actions">
+                            <button class="btn btn-success" onclick="setProgramRelay(2, true)">Turn On</button>
+                            <button class="btn btn-danger" onclick="setProgramRelay(2, false)">Turn Off</button>
+                        </div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="card-title" style="border:0;padding:0;margin-bottom:8px">
+                            <div>
+                                <h3>R3</h3>
+                                <span class="stat-label">GPIO<span id="dashboard-relay-r3-pin">15</span></span>
+                            </div>
+                            <span class="status-badge"><span id="dashboard-relay-r3-ind" class="indicator"></span><span id="dashboard-relay-r3-state">Off</span></span>
+                        </div>
+                        <div class="relay-test-actions">
+                            <button class="btn btn-success" onclick="setProgramRelay(3, true)">Turn On</button>
+                            <button class="btn btn-danger" onclick="setProgramRelay(3, false)">Turn Off</button>
+                        </div>
+                    </div>
+                </div>
+            </article>
+
+            <article class="card wide-card dashboard-system-card">
                 <div class="card-title">
                     <h2>System Information</h2>
                     <span class="status-badge">WDT: <b id="sys-wdt" style="color:var(--success)">Active</b></span>
@@ -661,7 +816,7 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
     </section>
 
     <section id="tab-settings" class="tab-content">
-        <article class="card">
+        <article class="card settings-card">
             <div class="card-title"><h2>Motor Mechanical And Limit Configuration</h2></div>
             <div class="settings-grid">
                 <div style="display:flex;flex-direction:column;gap:12px">
@@ -759,7 +914,7 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
                 </div>
             </div>
 
-            <div class="stat-box">
+            <div class="stat-box settings-utility-card">
                 <h3>Driver Power Management</h3>
                 <div class="stat-grid" style="margin-top:10px">
                     <div class="input-group">
@@ -772,7 +927,7 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
                     <div class="input-group"><label>Timeout Duration (seconds)</label><input type="number" id="sys-cfg-timeout-duration" value="10" min="1"></div>
                 </div>
             </div>
-            <div style="display:flex;justify-content:flex-end">
+            <div class="settings-actions">
                 <button class="btn btn-primary" onclick="saveMotorSettings()">Save And Apply Settings</button>
             </div>
         </article>
@@ -806,11 +961,21 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
                         <span class="stat-label">Saved Text</span>
                         <span class="stat-value" id="program-saved-length" style="font-size:0.9rem">0 chars</span>
                     </div>
+                    <div class="stat-box">
+                        <span class="stat-label">GPIO34 Button</span>
+                        <span class="stat-value" style="font-size:0.9rem"><span id="program-button-ind" class="indicator"></span> <span id="program-button-state">Released</span></span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-label">Button Starts</span>
+                        <span class="stat-value" id="program-button-count" style="font-size:0.9rem">0</span>
+                    </div>
                 </div>
 
                 <div class="input-group">
                     <label for="program-editor">Program Text</label>
-                    <textarea id="program-editor" spellcheck="false" oninput="programEditorChanged()"># X and Y values are relative movement in the active motor unit
+                    <div class="program-editor-shell">
+                        <div id="program-line-numbers" class="program-line-numbers" aria-hidden="true"></div>
+                        <textarea id="program-editor" spellcheck="false" oninput="programEditorChanged()" onscroll="syncProgramEditorScroll()"># X and Y values are relative movement in the active motor unit
 # VX and VY values are speed in steps/s
 VX 5000
 VY 5000
@@ -830,6 +995,7 @@ R3 ON
 D 100
 R3 OFF
 Gen1 OFF</textarea>
+                    </div>
                 </div>
 
                 <div class="button-row">
@@ -905,6 +1071,7 @@ Gen1 OFF</textarea>
         const wsReconnectInterval = 2000;
         let activeTab = "dashboard";
         let programSaveTimer = null;
+        let activeProgramLineNumber = 0;
 
         function initWebSocket() {
             const host = window.location.hostname || "192.168.4.1";
@@ -943,6 +1110,7 @@ Gen1 OFF</textarea>
                                 localStorage.setItem("motionProgramText", editor.value);
                                 syncProgramTextToDevice(false);
                             }
+                            updateProgramLineNumbers();
                         }
                         if (activeTab === "settings") populateConfigFields(data);
                         return;
@@ -968,8 +1136,8 @@ Gen1 OFF</textarea>
                 wdt.style.color = data.wdt ? "var(--success)" : "var(--danger)";
             }
 
-            updateRelayTelemetry(1, data.r1Active, data.r1Remaining);
-            updateRelayTelemetry(2, data.r2Active, data.r2Remaining);
+            updateRelayTelemetry(1, data.r1Active, data.r1RemainingMs);
+            updateRelayTelemetry(2, data.r2Active, data.r2RemainingMs);
             updateProgramTelemetry(data);
             updateProgramRelayTelemetry(data);
 
@@ -1049,8 +1217,17 @@ Gen1 OFF</textarea>
 
             status.innerText = data.programStatus || "Stopped";
             line.innerText = data.programLine || "-";
+            const currentLineMatch = String(data.programLine || "").match(/^(\d+):/);
+            setActiveProgramLine(currentLineMatch ? parseInt(currentLineMatch[1], 10) : 0);
             if (data.programSavedLength !== undefined) {
                 document.getElementById("program-saved-length").innerText = data.programSavedLength + " chars";
+            }
+            if (data.programStartButtonPressed !== undefined) {
+                updateIndicator("program-button-ind", data.programStartButtonPressed);
+                document.getElementById("program-button-state").innerText = data.programStartButtonPressed ? "Pressed" : "Released";
+            }
+            if (data.programStartButtonPressCount !== undefined) {
+                document.getElementById("program-button-count").innerText = data.programStartButtonPressCount;
             }
         }
 
@@ -1062,9 +1239,16 @@ Gen1 OFF</textarea>
 
         function updateProgramRelayStatus(relayId, active, pin) {
             if (active === undefined) return;
-            updateIndicator("relay-r" + relayId + "-ind", active);
-            document.getElementById("relay-r" + relayId + "-state").innerText = active ? "On" : "Off";
-            if (pin !== undefined) document.getElementById("relay-r" + relayId + "-pin").innerText = pin;
+            updateProgramRelayTarget("relay-r" + relayId, active, pin);
+            updateProgramRelayTarget("dashboard-relay-r" + relayId, active, pin);
+        }
+
+        function updateProgramRelayTarget(prefix, active, pin) {
+            updateIndicator(prefix + "-ind", active);
+            const state = document.getElementById(prefix + "-state");
+            const pinLabel = document.getElementById(prefix + "-pin");
+            if (state) state.innerText = active ? "On" : "Off";
+            if (pinLabel && pin !== undefined) pinLabel.innerText = pin;
         }
 
         function populateConfigFields(data) {
@@ -1236,10 +1420,48 @@ Gen1 OFF</textarea>
         function programEditorChanged() {
             const editor = document.getElementById("program-editor");
             localStorage.setItem("motionProgramText", editor.value);
+            updateProgramLineNumbers();
             if (programSaveTimer) clearTimeout(programSaveTimer);
             programSaveTimer = setTimeout(function() {
                 syncProgramTextToDevice(false);
             }, 800);
+        }
+
+        function updateProgramLineNumbers() {
+            const editor = document.getElementById("program-editor");
+            const gutter = document.getElementById("program-line-numbers");
+            if (!editor || !gutter) return;
+
+            const lineCount = editor.value.split("\n").length;
+            let numbers = "";
+            for (let lineNumber = 1; lineNumber <= lineCount; lineNumber++) {
+                const activeClass = lineNumber === activeProgramLineNumber ? " active" : "";
+                numbers += '<div class="program-line-number' + activeClass + '">' + lineNumber + "</div>";
+            }
+            gutter.innerHTML = numbers;
+            syncProgramEditorScroll();
+        }
+
+        function syncProgramEditorScroll() {
+            const editor = document.getElementById("program-editor");
+            const gutter = document.getElementById("program-line-numbers");
+            if (editor && gutter) gutter.scrollTop = editor.scrollTop;
+        }
+
+        function setActiveProgramLine(lineNumber) {
+            if (lineNumber === activeProgramLineNumber) return;
+            activeProgramLineNumber = lineNumber;
+            updateProgramLineNumbers();
+
+            if (lineNumber <= 0) return;
+            const editor = document.getElementById("program-editor");
+            const lineHeight = parseFloat(window.getComputedStyle(editor).lineHeight) || 21;
+            const lineTop = (lineNumber - 1) * lineHeight;
+            const lineBottom = lineTop + lineHeight;
+            if (lineTop < editor.scrollTop || lineBottom > editor.scrollTop + editor.clientHeight) {
+                editor.scrollTop = Math.max(0, lineTop - editor.clientHeight / 2 + lineHeight / 2);
+                syncProgramEditorScroll();
+            }
         }
 
         function syncProgramTextToDevice(showLog) {
@@ -1256,17 +1478,22 @@ Gen1 OFF</textarea>
 
         function triggerRelay(relayId) {
             const input = document.getElementById("r" + relayId + "-duration");
-            let duration = parseInt(input.value, 10);
-            if (isNaN(duration) || duration < 1) duration = 1;
-            if (duration > 86400) duration = 86400;
-            input.value = duration;
-            logConsole("Gen.Out" + relayId + " triggered for " + duration + " seconds.");
-            sendWsMsg({ cmd: "relay_trigger", relay: relayId, duration: duration });
+            let durationMs = parseInt(input.value, 10);
+            if (isNaN(durationMs) || durationMs < 1) durationMs = 1;
+            if (durationMs > 86400000) durationMs = 86400000;
+            input.value = durationMs;
+            logConsole("Gen.Out" + relayId + " triggered for " + durationMs + " ms.");
+            sendWsMsg({ cmd: "relay_trigger", relay: relayId, durationMs: durationMs });
         }
 
         function turnRelayOff(relayId) {
             logConsole("Gen.Out" + relayId + " manual off requested.");
             sendWsMsg({ cmd: "relay_off", relay: relayId });
+        }
+
+        function setProgramRelay(relayId, state) {
+            logConsole("Manual test: R" + relayId + (state ? " ON requested." : " OFF requested."));
+            sendWsMsg({ cmd: "program_relay_set", relay: relayId, state: !!state });
         }
 
         function rebootESP() {
@@ -1320,6 +1547,7 @@ Gen1 OFF</textarea>
         window.addEventListener("load", function() {
             const savedProgram = localStorage.getItem("motionProgramText");
             if (savedProgram) document.getElementById("program-editor").value = savedProgram;
+            updateProgramLineNumbers();
             initWebSocket();
         });
     </script>

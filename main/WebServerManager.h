@@ -30,6 +30,9 @@ public:
     // Starts the last saved Program tab text from a physical input button.
     void startSavedProgramFromButton();
 
+    // Updates live telemetry for the physical Program Start button.
+    void setProgramStartButtonPressed(bool pressed);
+
 private:
     enum ProgramCommandType {
         PROGRAM_CMD_NONE = 0,
@@ -76,6 +79,8 @@ private:
     bool _programDelayActive;
     unsigned long _programDelayStartedAt;
     uint32_t _programDelayMs;
+    bool _programStartButtonPressed;
+    uint32_t _programStartButtonPressCount;
     
     WifiConfig _wifiConfig;
     

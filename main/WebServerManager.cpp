@@ -8,7 +8,8 @@ WebServerManager::WebServerManager(StorageManager& storage, MotorController& m1,
       _lastBroadcastTime(0), _hasPendingLog(false),
       _programStatus("Stopped"),
       _programRunning(false), _programIndex(0), _programLineNumber(0), _programWaitingMotor(0),
-      _programDelayActive(false), _programDelayStartedAt(0), _programDelayMs(0) {}
+      _programDelayActive(false), _programDelayStartedAt(0), _programDelayMs(0),
+      _programStartButtonPressed(false), _programStartButtonPressCount(0) {}
 
 void WebServerManager::begin() {
     // 1. Wi-Fi Setup
@@ -81,7 +82,7 @@ void WebServerManager::queueLog(const String& message) {
 void WebServerManager::setupRoutes() {
     // Dashboard Homepage
     _server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
-        request->send(200, "text/html", INDEX_HTML);
+        request->send(200, "text/html", reinterpret_cast<const uint8_t*>(INDEX_HTML), sizeof(INDEX_HTML) - 1);
     });
 
     // REST: GET /status
@@ -355,15 +356,15 @@ void WebServerManager::processJsonCommand(JsonDocument& doc, AsyncWebSocketClien
     }
     else if (cmd == "relay_trigger") {
         int relay = doc["relay"] | 1;
-        uint32_t duration = doc["duration"] | 1;
-        if (duration > 86400) duration = 86400;
+        uint32_t durationMs = doc["durationMs"] | 1;
+        if (durationMs > 86400000UL) durationMs = 86400000UL;
 
         if (relay == 1) {
-            _r1.trigger(duration);
-            queueLog("Gen.Out1 triggered for " + String(duration) + " seconds.");
+            _r1.triggerMilliseconds(durationMs);
+            queueLog("Gen.Out1 triggered for " + String(durationMs) + " ms.");
         } else {
-            _r2.trigger(duration);
-            queueLog("Gen.Out2 triggered for " + String(duration) + " seconds.");
+            _r2.triggerMilliseconds(durationMs);
+            queueLog("Gen.Out2 triggered for " + String(durationMs) + " ms.");
         }
     }
     else if (cmd == "relay_off") {
@@ -376,6 +377,24 @@ void WebServerManager::processJsonCommand(JsonDocument& doc, AsyncWebSocketClien
             _r2.turnOff();
             queueLog("Gen.Out2 turned off.");
         }
+    }
+    else if (cmd == "program_relay_set") {
+        int relayNumber = doc["relay"] | 0;
+        bool turnOn = doc["state"] | false;
+        RelayController* relay = nullptr;
+
+        if (relayNumber == 1) relay = &_programR1;
+        else if (relayNumber == 2) relay = &_programR2;
+        else if (relayNumber == 3) relay = &_programR3;
+
+        if (!relay) {
+            queueLog("Error: invalid program relay number.");
+            return;
+        }
+
+        if (turnOn) relay->turnOn();
+        else relay->turnOff();
+        queueLog("Manual test: R" + String(relayNumber) + (turnOn ? " ON." : " OFF."));
     }
     else if (cmd == "program_start") {
         String programText = doc["program"] | "";
@@ -509,6 +528,7 @@ bool WebServerManager::saveProgramText(const String& programText) {
 }
 
 void WebServerManager::startSavedProgramFromButton() {
+    _programStartButtonPressCount++;
     if (_savedProgramText.length() == 0) {
         setProgramStatus("Error: no saved program");
         queueLog("Physical program start button pressed, but no Program tab text is saved.");
@@ -517,6 +537,10 @@ void WebServerManager::startSavedProgramFromButton() {
 
     queueLog("Physical program start button pressed.");
     startProgram(_savedProgramText);
+}
+
+void WebServerManager::setProgramStartButtonPressed(bool pressed) {
+    _programStartButtonPressed = pressed;
 }
 
 void WebServerManager::stopProgram(bool stopOutputs) {
@@ -834,10 +858,10 @@ String WebServerManager::getTelemetryJson() {
     doc["heap"] = ESP.getFreeHeap();
     doc["wdt"] = true; // Task watchdog is running and checked in main.ino
     doc["r1Active"] = _r1.isActive();
-    doc["r1Remaining"] = _r1.getRemainingSeconds();
+    doc["r1RemainingMs"] = _r1.getRemainingMilliseconds();
     doc["r1Pin"] = _r1.getPin();
     doc["r2Active"] = _r2.isActive();
-    doc["r2Remaining"] = _r2.getRemainingSeconds();
+    doc["r2RemainingMs"] = _r2.getRemainingMilliseconds();
     doc["r2Pin"] = _r2.getPin();
     doc["relayR1Active"] = _programR1.isActive();
     doc["relayR1Pin"] = _programR1.getPin();
@@ -850,6 +874,8 @@ String WebServerManager::getTelemetryJson() {
     doc["programLine"] = _programCurrentLineText;
     doc["programSavedLength"] = _savedProgramText.length();
     doc["programStartButtonPin"] = PROGRAM_START_BUTTON_PIN;
+    doc["programStartButtonPressed"] = _programStartButtonPressed;
+    doc["programStartButtonPressCount"] = _programStartButtonPressCount;
     
     if (_hasPendingLog) {
         doc["log"] = _pendingLog;

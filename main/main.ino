@@ -43,6 +43,7 @@ bool readProgramStartButtonPressed() {
 void updateProgramStartButton() {
     bool reading = readProgramStartButtonPressed();
     unsigned long now = millis();
+    webServer.setProgramStartButtonPressed(reading);
 
     if (reading != lastProgramButtonReading) {
         lastProgramButtonReading = reading;
