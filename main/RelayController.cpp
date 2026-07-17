@@ -11,6 +11,9 @@ void RelayController::begin(int id, int pin, bool activeHigh) {
     _durationMs = 0;
     _startedAt = 0;
 
+    // Preload the inactive output latch before enabling the pin as OUTPUT.
+    // This avoids a short active pulse during firmware-controlled initialization.
+    writeRelay(false);
     pinMode(_pin, OUTPUT);
     writeRelay(false);
 }

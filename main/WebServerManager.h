@@ -29,15 +29,18 @@ public:
 
     // Starts the last saved Program tab text from a physical input button.
     void startSavedProgramFromButton();
+    void startSavedResetProgramFromButton();
 
     // Updates live telemetry for the physical Program Start button.
     void setProgramStartButtonPressed(bool pressed);
+    void setResetProgramButtonPressed(bool pressed);
 
 private:
     enum ProgramCommandType {
         PROGRAM_CMD_NONE = 0,
         PROGRAM_CMD_MOVE,
         PROGRAM_CMD_SPEED,
+        PROGRAM_CMD_HOME,
         PROGRAM_CMD_DELAY,
         PROGRAM_CMD_GEN_OUTPUT,
         PROGRAM_CMD_RELAY
@@ -70,6 +73,8 @@ private:
 
     String _programText;
     String _savedProgramText;
+    String _savedResetProgramText;
+    String _activeProgramName;
     String _programStatus;
     String _programCurrentLineText;
     bool _programRunning;
@@ -81,6 +86,8 @@ private:
     uint32_t _programDelayMs;
     bool _programStartButtonPressed;
     uint32_t _programStartButtonPressCount;
+    bool _resetProgramButtonPressed;
+    uint32_t _resetProgramButtonPressCount;
     
     WifiConfig _wifiConfig;
     
@@ -88,8 +95,9 @@ private:
     void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len);
     void handleWebSocketMessage(void *arg, uint8_t *data, size_t len, AsyncWebSocketClient *client);
     void processJsonCommand(JsonDocument& doc, AsyncWebSocketClient *client);
-    void startProgram(const String& programText);
+    void startProgram(const String& programText, const String& programName, bool saveText);
     bool saveProgramText(const String& programText);
+    bool saveResetProgramText(const String& programText);
     void stopProgram(bool stopOutputs);
     void updateProgram();
     bool readNextProgramLine(String& line, int& lineNumber);

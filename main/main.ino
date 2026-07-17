@@ -34,10 +34,28 @@ long lastSavedPos2 = 0;
 bool lastProgramButtonReading = false;
 bool stableProgramButtonPressed = false;
 unsigned long lastProgramButtonChangeAt = 0;
+bool lastResetProgramButtonReading = false;
+bool stableResetProgramButtonPressed = false;
+unsigned long lastResetProgramButtonChangeAt = 0;
+
+void configureGenOutputsInactiveEarly() {
+    const int inactiveLevel = RELAY_ACTIVE_HIGH ? LOW : HIGH;
+    digitalWrite(RELAY1_PIN, inactiveLevel);
+    digitalWrite(RELAY2_PIN, inactiveLevel);
+    pinMode(RELAY1_PIN, OUTPUT);
+    pinMode(RELAY2_PIN, OUTPUT);
+    digitalWrite(RELAY1_PIN, inactiveLevel);
+    digitalWrite(RELAY2_PIN, inactiveLevel);
+}
 
 bool readProgramStartButtonPressed() {
     bool rawState = digitalRead(PROGRAM_START_BUTTON_PIN);
     return PROGRAM_START_BUTTON_ACTIVE_LOW ? !rawState : rawState;
+}
+
+bool readResetProgramButtonPressed() {
+    bool rawState = digitalRead(RESET_PROGRAM_BUTTON_PIN);
+    return RESET_PROGRAM_BUTTON_ACTIVE_LOW ? !rawState : rawState;
 }
 
 void updateProgramStartButton() {
@@ -62,7 +80,31 @@ void updateProgramStartButton() {
     }
 }
 
+void updateResetProgramButton() {
+    bool reading = readResetProgramButtonPressed();
+    unsigned long now = millis();
+    webServer.setResetProgramButtonPressed(reading);
+
+    if (reading != lastResetProgramButtonReading) {
+        lastResetProgramButtonReading = reading;
+        lastResetProgramButtonChangeAt = now;
+    }
+
+    if ((now - lastResetProgramButtonChangeAt) < RESET_PROGRAM_BUTTON_DEBOUNCE_MS) {
+        return;
+    }
+
+    if (reading != stableResetProgramButtonPressed) {
+        stableResetProgramButtonPressed = reading;
+        if (stableResetProgramButtonPressed) {
+            webServer.startSavedResetProgramFromButton();
+        }
+    }
+}
+
 void setup() {
+    configureGenOutputsInactiveEarly();
+
     // 1. Initialize Serial
     Serial.begin(115200);
     while(!Serial && millis() < 2000); // Wait up to 2s for native USB
@@ -124,6 +166,12 @@ void setup() {
     lastProgramButtonChangeAt = millis();
     Serial.printf("Physical Program Start button initialized on GPIO%d. Use external pull-up.\n", PROGRAM_START_BUTTON_PIN);
 
+    pinMode(RESET_PROGRAM_BUTTON_PIN, INPUT);
+    lastResetProgramButtonReading = readResetProgramButtonPressed();
+    stableResetProgramButtonPressed = lastResetProgramButtonReading;
+    lastResetProgramButtonChangeAt = millis();
+    Serial.printf("Physical Reset Program button initialized on GPIO%d. Use external pull-up.\n", RESET_PROGRAM_BUTTON_PIN);
+
     // 8. Initialize Web server and AP+STA Wi-Fi
     webServer.begin();
     webServer.queueLog("System loaded successfully.");
@@ -160,6 +208,7 @@ void loop() {
 
     // 4. Update physical Program Start button
     updateProgramStartButton();
+    updateResetProgramButton();
 
     // 5. Update Web Server events & WebSocket Broadcasts
     webServer.update();

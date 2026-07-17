@@ -78,6 +78,15 @@ bool StorageManager::saveProgramText(const String& programText) {
     return _prefs.putString("program_text", programText) > 0 || programText.length() == 0;
 }
 
+bool StorageManager::loadResetProgramText(String& programText) {
+    programText = _prefs.getString("reset_prog", "");
+    return true;
+}
+
+bool StorageManager::saveResetProgramText(const String& programText) {
+    return _prefs.putString("reset_prog", programText) > 0 || programText.length() == 0;
+}
+
 bool StorageManager::savePositions(long pos1, long pos2) {
     SystemConfig config;
     if (loadSystemConfig(config)) {

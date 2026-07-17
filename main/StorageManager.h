@@ -25,6 +25,10 @@ public:
     bool loadProgramText(String& programText);
     bool saveProgramText(const String& programText);
 
+    // Separate reset program text used by the Reset Program editor and physical reset button
+    bool loadResetProgramText(String& programText);
+    bool saveResetProgramText(const String& programText);
+
     // Save Motor Positions specifically
     bool savePositions(long pos1, long pos2);
 

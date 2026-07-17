@@ -6,10 +6,11 @@ WebServerManager::WebServerManager(StorageManager& storage, MotorController& m1,
     : _storage(storage), _m1(m1), _m2(m2), _r1(r1), _r2(r2),
       _programR1(programR1), _programR2(programR2), _programR3(programR3), _server(80), _ws("/ws"),
       _lastBroadcastTime(0), _hasPendingLog(false),
-      _programStatus("Stopped"),
+      _activeProgramName("Program"), _programStatus("Stopped"),
       _programRunning(false), _programIndex(0), _programLineNumber(0), _programWaitingMotor(0),
       _programDelayActive(false), _programDelayStartedAt(0), _programDelayMs(0),
-      _programStartButtonPressed(false), _programStartButtonPressCount(0) {}
+      _programStartButtonPressed(false), _programStartButtonPressCount(0),
+      _resetProgramButtonPressed(false), _resetProgramButtonPressCount(0) {}
 
 void WebServerManager::begin() {
     // 1. Wi-Fi Setup
@@ -38,6 +39,13 @@ void WebServerManager::begin() {
         Serial.printf("Saved Program tab text loaded from NVS (%u bytes).\n", _savedProgramText.length());
     } else {
         Serial.println("No saved Program tab text found in NVS.");
+    }
+
+    _storage.loadResetProgramText(_savedResetProgramText);
+    if (_savedResetProgramText.length() > 0) {
+        Serial.printf("Saved Reset Program text loaded from NVS (%u bytes).\n", _savedResetProgramText.length());
+    } else {
+        Serial.println("No saved Reset Program text found in NVS.");
     }
     
     // 2. WebSocket Setup
@@ -398,11 +406,19 @@ void WebServerManager::processJsonCommand(JsonDocument& doc, AsyncWebSocketClien
     }
     else if (cmd == "program_start") {
         String programText = doc["program"] | "";
-        startProgram(programText);
+        startProgram(programText, "Program", true);
     }
     else if (cmd == "program_save") {
         String programText = doc["program"] | "";
         saveProgramText(programText);
+    }
+    else if (cmd == "reset_program_start") {
+        String programText = doc["program"] | "";
+        startProgram(programText, "Reset Program", true);
+    }
+    else if (cmd == "reset_program_save") {
+        String programText = doc["program"] | "";
+        saveResetProgramText(programText);
     }
     else if (cmd == "program_stop") {
         stopProgram(true);
@@ -478,25 +494,34 @@ void WebServerManager::processJsonCommand(JsonDocument& doc, AsyncWebSocketClien
     }
 }
 
-void WebServerManager::startProgram(const String& programText) {
+void WebServerManager::startProgram(const String& programText, const String& programName, bool saveText) {
+    if (_programRunning) {
+        queueLog(programName + " start ignored because " + _activeProgramName + " is already running.");
+        return;
+    }
+
     if (programText.length() == 0) {
         setProgramStatus("Error: empty program");
-        queueLog("Program could not start because the saved program text is empty.");
+        queueLog(programName + " could not start because its saved text is empty.");
         return;
     }
 
     if (_m1.isRunning() || _m2.isRunning() || _m1.isHoming() || _m2.isHoming()) {
         setProgramStatus("Error: motors busy");
-        queueLog("Program could not start because a motor is already moving.");
+        queueLog(programName + " could not start because a motor is already moving.");
         return;
     }
 
-    if (!saveProgramText(programText)) {
-        setProgramStatus("Error: save failed");
-        return;
+    if (saveText) {
+        bool saved = (programName == "Reset Program") ? saveResetProgramText(programText) : saveProgramText(programText);
+        if (!saved) {
+            setProgramStatus("Error: save failed");
+            return;
+        }
     }
 
     _programText = programText;
+    _activeProgramName = programName;
     _programIndex = 0;
     _programLineNumber = 0;
     _programWaitingMotor = 0;
@@ -505,8 +530,8 @@ void WebServerManager::startProgram(const String& programText) {
     _programDelayMs = 0;
     _programCurrentLineText = "";
     _programRunning = true;
-    setProgramStatus("Running");
-    queueLog("Program started.");
+    setProgramStatus(programName + " running");
+    queueLog(programName + " started.");
 }
 
 bool WebServerManager::saveProgramText(const String& programText) {
@@ -527,8 +552,30 @@ bool WebServerManager::saveProgramText(const String& programText) {
     return false;
 }
 
+bool WebServerManager::saveResetProgramText(const String& programText) {
+    if (programText.length() > PROGRAM_TEXT_MAX_LENGTH) {
+        queueLog("Reset Program text is too long. Maximum length is " + String(PROGRAM_TEXT_MAX_LENGTH) + " characters.");
+        return false;
+    }
+
+    if (programText == _savedResetProgramText) return true;
+
+    if (_storage.saveResetProgramText(programText)) {
+        _savedResetProgramText = programText;
+        Serial.printf("Reset Program text saved to NVS (%u bytes).\n", _savedResetProgramText.length());
+        return true;
+    }
+
+    queueLog("Error: Reset Program text could not be saved to flash memory.");
+    return false;
+}
+
 void WebServerManager::startSavedProgramFromButton() {
     _programStartButtonPressCount++;
+    if (_programRunning) {
+        queueLog("Physical program start button ignored because " + _activeProgramName + " is already running.");
+        return;
+    }
     if (_savedProgramText.length() == 0) {
         setProgramStatus("Error: no saved program");
         queueLog("Physical program start button pressed, but no Program tab text is saved.");
@@ -536,11 +583,31 @@ void WebServerManager::startSavedProgramFromButton() {
     }
 
     queueLog("Physical program start button pressed.");
-    startProgram(_savedProgramText);
+    startProgram(_savedProgramText, "Program", false);
+}
+
+void WebServerManager::startSavedResetProgramFromButton() {
+    _resetProgramButtonPressCount++;
+    if (_programRunning) {
+        queueLog("Physical reset program button ignored because " + _activeProgramName + " is already running.");
+        return;
+    }
+    if (_savedResetProgramText.length() == 0) {
+        setProgramStatus("Error: no saved reset program");
+        queueLog("Physical reset program button pressed, but no Reset Program text is saved.");
+        return;
+    }
+
+    queueLog("Physical reset program button pressed.");
+    startProgram(_savedResetProgramText, "Reset Program", false);
 }
 
 void WebServerManager::setProgramStartButtonPressed(bool pressed) {
     _programStartButtonPressed = pressed;
+}
+
+void WebServerManager::setResetProgramButtonPressed(bool pressed) {
+    _resetProgramButtonPressed = pressed;
 }
 
 void WebServerManager::stopProgram(bool stopOutputs) {
@@ -548,6 +615,7 @@ void WebServerManager::stopProgram(bool stopOutputs) {
     _programWaitingMotor = 0;
     _programDelayActive = false;
     _programCurrentLineText = "";
+    _activeProgramName = "Program";
     if (stopOutputs) {
         _m1.stop();
         _m2.stop();
@@ -618,6 +686,11 @@ void WebServerManager::updateProgram() {
             return;
         }
         queueLog("Program line " + String(lineNumber) + ": Motor " + String(command.motor) + " speed set to " + String(command.value) + " steps/s.");
+    } else if (command.type == PROGRAM_CMD_HOME) {
+        MotorController& motor = (command.motor == 1) ? _m1 : _m2;
+        motor.startHoming();
+        _programWaitingMotor = command.motor;
+        queueLog("Program line " + String(lineNumber) + ": Motor " + String(command.motor) + " homing started.");
     } else if (command.type == PROGRAM_CMD_DELAY) {
         _programDelayActive = true;
         _programDelayStartedAt = millis();
@@ -685,6 +758,12 @@ bool WebServerManager::parseProgramLine(String line, ProgramCommand& command, St
     op.trim();
     arg.trim();
     op.toUpperCase();
+
+    if ((op == "X" || op == "Y") && arg.equalsIgnoreCase("HOME")) {
+        command.type = PROGRAM_CMD_HOME;
+        command.motor = (op == "X") ? 1 : 2;
+        return true;
+    }
 
     if (op == "X" || op == "Y" || op == "VX" || op == "VY") {
         if (arg.length() == 0) {
@@ -871,11 +950,16 @@ String WebServerManager::getTelemetryJson() {
     doc["relayR3Pin"] = _programR3.getPin();
     doc["programRunning"] = _programRunning;
     doc["programStatus"] = _programStatus;
+    doc["activeProgramName"] = _activeProgramName;
     doc["programLine"] = _programCurrentLineText;
     doc["programSavedLength"] = _savedProgramText.length();
+    doc["resetProgramSavedLength"] = _savedResetProgramText.length();
     doc["programStartButtonPin"] = PROGRAM_START_BUTTON_PIN;
     doc["programStartButtonPressed"] = _programStartButtonPressed;
     doc["programStartButtonPressCount"] = _programStartButtonPressCount;
+    doc["resetProgramButtonPin"] = RESET_PROGRAM_BUTTON_PIN;
+    doc["resetProgramButtonPressed"] = _resetProgramButtonPressed;
+    doc["resetProgramButtonPressCount"] = _resetProgramButtonPressCount;
     
     if (_hasPendingLog) {
         doc["log"] = _pendingLog;
@@ -891,7 +975,7 @@ String WebServerManager::getConfigJson() {
     #if ARDUINOJSON_VERSION_MAJOR >= 7
         JsonDocument doc;
     #else
-        DynamicJsonDocument doc(8192);
+        DynamicJsonDocument doc(14336);
     #endif
     
     doc["configUpdate"] = true;
@@ -930,6 +1014,7 @@ String WebServerManager::getConfigJson() {
     doc["sysCfg"]["timeoutActive"] = sysCfg.enableTimeoutActive;
     doc["sysCfg"]["timeoutDuration"] = sysCfg.enableTimeoutDuration;
     doc["savedProgramText"] = _savedProgramText;
+    doc["savedResetProgramText"] = _savedResetProgramText;
     
     String output;
     serializeJson(doc, output);

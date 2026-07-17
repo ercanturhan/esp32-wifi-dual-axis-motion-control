@@ -37,6 +37,14 @@
 #define PROGRAM_START_BUTTON_PIN 34
 #define PROGRAM_START_BUTTON_ACTIVE_LOW true
 #define PROGRAM_START_BUTTON_DEBOUNCE_MS 50
+
+// Physical Reset Program Start Button
+// GPIO35 is input-only and has no internal pull-up/down. Use an external 10k pull-up to 3.3V
+// and wire the button between GPIO35 and GND.
+#define RESET_PROGRAM_BUTTON_PIN 35
+#define RESET_PROGRAM_BUTTON_ACTIVE_LOW true
+#define RESET_PROGRAM_BUTTON_DEBOUNCE_MS 50
+
 #define PROGRAM_TEXT_MAX_LENGTH 4096
 
 // AP WiFi Defaults

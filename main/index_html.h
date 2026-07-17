@@ -12,17 +12,20 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
     <title>ESP32 Dual Axis Motion Control</title>
     <style>
         :root {
-            --bg: #0b0f19;
-            --panel: rgba(20, 30, 55, 0.72);
-            --panel-2: rgba(255, 255, 255, 0.04);
-            --border: rgba(255, 255, 255, 0.1);
-            --text: #f3f4f6;
-            --muted: #9ca3af;
-            --primary: #3b82f6;
-            --success: #10b981;
-            --danger: #ef4444;
-            --warning: #f59e0b;
-            --accent: #8b5cf6;
+            --bg: #f1f1f3;
+            --panel: #ffffff;
+            --panel-2: #fff7ed;
+            --border: #fd8208;
+            --soft-border: rgba(253, 130, 8, 0.28);
+            --text: #1f2933;
+            --muted: #6b7280;
+            --primary: #fd8208;
+            --primary-dark: #b85600;
+            --primary-soft: rgba(253, 130, 8, 0.14);
+            --success: #138a5b;
+            --danger: #c42147;
+            --warning: #b76b00;
+            --accent: #ffb15c;
         }
 
         * {
@@ -34,12 +37,20 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
 
         body {
             min-height: 100vh;
-            background:
-                radial-gradient(circle at top left, rgba(59, 130, 246, 0.16), transparent 32rem),
-                radial-gradient(circle at bottom right, rgba(16, 185, 129, 0.12), transparent 30rem),
-                var(--bg);
+            background: var(--bg);
             color: var(--text);
             padding: 20px;
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            pointer-events: none;
+            background:
+                linear-gradient(135deg, rgba(253, 130, 8, 0.10) 0 10%, transparent 10% 76%, rgba(253, 130, 8, 0.07) 76% 100%),
+                var(--bg);
         }
 
         header {
@@ -48,7 +59,7 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
             justify-content: space-between;
             gap: 16px;
             padding-bottom: 18px;
-            border-bottom: 1px solid var(--border);
+            border-bottom: 1px solid var(--soft-border);
             margin-bottom: 18px;
             flex-wrap: wrap;
         }
@@ -94,13 +105,13 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
             height: 10px;
             border-radius: 50%;
             display: inline-block;
-            background: rgba(255, 255, 255, 0.18);
+            background: #d1d5db;
         }
 
         .status-dot.connected,
         .indicator.active {
             background: var(--success);
-            box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+            box-shadow: 0 0 0 3px rgba(19, 138, 91, 0.16);
         }
 
         .tabs {
@@ -108,7 +119,7 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
             gap: 10px;
             padding-bottom: 14px;
             margin-bottom: 18px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            border-bottom: 1px solid var(--soft-border);
             overflow-x: auto;
         }
 
@@ -117,7 +128,7 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
             border-radius: 8px;
             border: 1px solid var(--border);
             color: var(--muted);
-            background: rgba(255, 255, 255, 0.03);
+            background: rgba(255, 255, 255, 0.86);
             cursor: pointer;
             white-space: nowrap;
             font-weight: 650;
@@ -174,7 +185,7 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
             display: flex;
             flex-direction: column;
             gap: 14px;
-            backdrop-filter: blur(14px);
+            box-shadow: 0 10px 22px rgba(253, 130, 8, 0.10);
         }
 
         .wide-card {
@@ -204,7 +215,7 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
             justify-content: space-between;
             gap: 12px;
             padding-bottom: 10px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            border-bottom: 1px solid var(--soft-border);
         }
 
         .subtitle {
@@ -221,7 +232,7 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
 
         .stat-box {
             background: var(--panel-2);
-            border: 1px solid rgba(255, 255, 255, 0.06);
+            border: 1px solid var(--soft-border);
             border-radius: 8px;
             padding: 10px;
             min-width: 0;
@@ -256,17 +267,17 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
             text-transform: uppercase;
         }
 
-        .badge-disabled { background: rgba(156, 163, 175, 0.16); color: #d1d5db; }
-        .badge-idle { background: rgba(59, 130, 246, 0.16); color: #93c5fd; }
-        .badge-moving { background: rgba(16, 185, 129, 0.16); color: #6ee7b7; }
-        .badge-homing { background: rgba(245, 158, 11, 0.16); color: #fcd34d; }
-        .badge-error { background: rgba(239, 68, 68, 0.16); color: #fca5a5; }
+        .badge-disabled { background: #f3f4f6; color: #6b7280; border: 1px solid #d1d5db; }
+        .badge-idle { background: var(--primary-soft); color: var(--primary-dark); border: 1px solid var(--soft-border); }
+        .badge-moving { background: rgba(19, 138, 91, 0.12); color: var(--success); border: 1px solid rgba(19, 138, 91, 0.24); }
+        .badge-homing { background: rgba(183, 107, 0, 0.12); color: var(--warning); border: 1px solid rgba(183, 107, 0, 0.24); }
+        .badge-error { background: rgba(196, 33, 71, 0.12); color: var(--danger); border: 1px solid rgba(196, 33, 71, 0.24); }
 
         .progress-container {
             height: 10px;
             overflow: hidden;
             border-radius: 999px;
-            background: rgba(255, 255, 255, 0.08);
+            background: #ffe8cf;
         }
 
         .progress-bar {
@@ -293,9 +304,9 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
         select,
         textarea {
             width: 100%;
-            background: rgba(255, 255, 255, 0.05);
+            background: #ffffff;
             color: var(--text);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid var(--border);
             border-radius: 8px;
             padding: 10px 11px;
             outline: none;
@@ -320,8 +331,8 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
             min-height: 300px;
             overflow: hidden;
             padding: 10px 8px 10px 4px;
-            background: rgba(0, 0, 0, 0.2);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: #fff7ed;
+            border: 1px solid var(--border);
             border-right: 0;
             border-radius: 8px 0 0 8px;
             color: var(--muted);
@@ -339,7 +350,7 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
 
         .program-line-number.active {
             color: #ffffff;
-            background: rgba(59, 130, 246, 0.45);
+            background: var(--primary);
             border-radius: 4px;
             font-weight: 700;
         }
@@ -360,7 +371,7 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
         select:focus,
         textarea:focus {
             border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+            box-shadow: 0 0 0 3px rgba(253, 130, 8, 0.20);
         }
 
         .input-with-btn,
@@ -402,16 +413,34 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
 
         .program-grid {
             display: grid;
-            grid-template-columns: minmax(520px, 740px) minmax(300px, 420px);
+            grid-template-columns: repeat(2, minmax(0, 560px));
             justify-content: start;
             gap: 18px;
-            align-items: start;
+            align-items: stretch;
         }
 
         .program-status {
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: 10px;
+        }
+
+        .program-main-card {
+            width: 100%;
+        }
+
+        .program-main-card .program-status {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .program-main-card .program-editor-shell,
+        .program-main-card textarea,
+        .program-main-card .program-line-numbers {
+            min-height: 260px;
+        }
+
+        .program-support-card {
+            grid-column: span 1;
         }
 
         .command-list {
@@ -423,17 +452,17 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
         }
 
         .command-list code {
-            color: #bfdbfe;
+            color: var(--primary-dark);
             font-family: Consolas, monospace;
         }
 
         .btn,
         .emergency-btn {
             min-height: 40px;
-            border: 1px solid rgba(255, 255, 255, 0.12);
+            border: 1px solid var(--border);
             border-radius: 8px;
-            color: white;
-            background: rgba(255, 255, 255, 0.08);
+            color: var(--primary-dark);
+            background: #ffffff;
             cursor: pointer;
             font-weight: 800;
             font-size: 0.88rem;
@@ -449,11 +478,11 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
             filter: brightness(1.12);
         }
 
-        .btn-primary { background: #2563eb; border-color: transparent; }
-        .btn-success { background: #059669; border-color: transparent; }
-        .btn-warning { background: #d97706; border-color: transparent; }
+        .btn-primary { background: var(--primary); color: #ffffff; border-color: transparent; }
+        .btn-success { background: #fd8208; color: #ffffff; border-color: transparent; }
+        .btn-warning { background: #ffd7ad; color: var(--primary-dark); border-color: var(--border); }
         .btn-danger,
-        .emergency-btn { background: #dc2626; border-color: transparent; }
+        .emergency-btn { background: var(--primary-dark); color: #ffffff; border-color: transparent; }
 
         .state-row {
             display: grid;
@@ -466,14 +495,14 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
         .console {
             height: 160px;
             overflow: auto;
-            background: #050914;
+            background: #ffffff;
             border: 1px solid var(--border);
             border-radius: 8px;
             padding: 12px;
             font-family: Consolas, monospace;
             font-size: 0.82rem;
             line-height: 1.45;
-            color: #86efac;
+            color: var(--primary-dark);
         }
 
         .console-entry {
@@ -482,12 +511,12 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
         }
 
         .console-time {
-            color: #93c5fd;
+            color: var(--primary);
             flex: 0 0 auto;
         }
 
         .console-warn { color: var(--warning); }
-        .console-err { color: #fca5a5; }
+        .console-err { color: var(--danger); }
 
         footer {
             padding: 24px 0 4px;
@@ -935,7 +964,7 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
 
     <section id="tab-program" class="tab-content">
         <div class="program-grid">
-            <article class="card">
+            <article class="card program-main-card">
                 <div class="card-title">
                     <div>
                         <h2>Sequential Program</h2>
@@ -977,6 +1006,7 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
                         <div id="program-line-numbers" class="program-line-numbers" aria-hidden="true"></div>
                         <textarea id="program-editor" spellcheck="false" oninput="programEditorChanged()" onscroll="syncProgramEditorScroll()"># X and Y values are relative movement in the active motor unit
 # VX and VY values are speed in steps/s
+# X HOME and Y HOME start homing cycles
 VX 5000
 VY 5000
 X 50
@@ -1004,7 +1034,53 @@ Gen1 OFF</textarea>
                 </div>
             </article>
 
-            <article class="card">
+            <article class="card program-main-card">
+                <div class="card-title">
+                    <div>
+                        <h2>Reset Program</h2>
+                        <div class="subtitle">Separate saved program text. Reset Program runs this text from the button below or the GPIO35 reset input.</div>
+                    </div>
+                </div>
+
+                <div class="program-status">
+                    <div class="stat-box">
+                        <span class="stat-label">Saved Text</span>
+                        <span class="stat-value" id="reset-program-saved-length" style="font-size:0.9rem">0 chars</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-label">GPIO35 Button</span>
+                        <span class="stat-value" style="font-size:0.9rem"><span id="reset-program-button-ind" class="indicator"></span> <span id="reset-program-button-state">Released</span></span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-label">Button Starts</span>
+                        <span class="stat-value" id="reset-program-button-count" style="font-size:0.9rem">0</span>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label for="reset-program-editor">Reset Program Text</label>
+                    <div class="program-editor-shell">
+                        <div id="reset-program-line-numbers" class="program-line-numbers" aria-hidden="true"></div>
+                        <textarea id="reset-program-editor" spellcheck="false" oninput="resetProgramEditorChanged()" onscroll="syncProgramEditorScroll('reset')"># Reset Program example
+# Commands are the same as Run Program
+X HOME
+Y HOME
+D 100
+Gen1 OFF
+Gen2 OFF
+R1 OFF
+R2 OFF
+R3 OFF</textarea>
+                    </div>
+                </div>
+
+                <div class="button-row">
+                    <button class="btn btn-success" onclick="runResetProgram()">Reset Program</button>
+                    <button class="btn btn-danger" onclick="stopProgram()">Stop Program</button>
+                </div>
+            </article>
+
+            <article class="card program-support-card">
                 <div class="card-title">
                     <h2>Program Help</h2>
                 </div>
@@ -1014,19 +1090,23 @@ Gen1 OFF</textarea>
                     <div><code>Y 10</code> moves the Y axis, Motor 2, +10 relative units.</div>
                     <div><code>VX 5000</code> sets X axis, Motor 1, speed to 5000 steps/s.</div>
                     <div><code>VY 5000</code> sets Y axis, Motor 2, speed to 5000 steps/s.</div>
+                    <div><code>X HOME</code> starts X axis, Motor 1, homing and waits until it finishes.</div>
+                    <div><code>Y HOME</code> starts Y axis, Motor 2, homing and waits until it finishes.</div>
                     <div><code>D 100</code> waits 100 milliseconds before the next line.</div>
                     <div><code>Gen1 ON</code> turns Gen.Out1 on until another command turns it off.</div>
                     <div><code>Gen2 OFF</code> turns Gen.Out2 off.</div>
                     <div><code>R1 ON</code> turns the R1 relay output on.</div>
                     <div><code>R2 OFF</code> turns the R2 relay output off.</div>
                     <div><code>R3 ON</code> turns the R3 relay output on.</div>
-                    <div><code>GPIO34</code> physical button starts the last saved program text.</div>
+                    <div><code>GPIO34</code> physical button starts the last saved Run Program text.</div>
+                    <div><code>GPIO35</code> physical button starts the last saved Reset Program text.</div>
+                    <div>If a program is already running, new Run Program or Reset Program start requests are ignored.</div>
                     <div>Use <code>#</code> or <code>//</code> for comments. Empty lines are ignored.</div>
                     <div>The movement unit is the unit selected in Motor Settings: mm, cm, degree, or pulse.</div>
                 </div>
             </article>
 
-            <article class="card">
+            <article class="card program-support-card">
                 <div class="card-title">
                     <h2>Program Relay Outputs</h2>
                 </div>
@@ -1071,7 +1151,9 @@ Gen1 OFF</textarea>
         const wsReconnectInterval = 2000;
         let activeTab = "dashboard";
         let programSaveTimer = null;
+        let resetProgramSaveTimer = null;
         let activeProgramLineNumber = 0;
+        let activeProgramEditor = "program";
 
         function initWebSocket() {
             const host = window.location.hostname || "192.168.4.1";
@@ -1109,6 +1191,22 @@ Gen1 OFF</textarea>
                             } else {
                                 localStorage.setItem("motionProgramText", editor.value);
                                 syncProgramTextToDevice(false);
+                            }
+                            updateProgramLineNumbers();
+                        }
+                        if (data.savedResetProgramText !== undefined) {
+                            const editor = document.getElementById("reset-program-editor");
+                            const localProgram = localStorage.getItem("resetProgramText");
+                            const savedProgramText = String(data.savedResetProgramText || "");
+                            if (localProgram) {
+                                editor.value = localProgram;
+                                syncResetProgramTextToDevice(false);
+                            } else if (savedProgramText.length) {
+                                editor.value = data.savedResetProgramText;
+                                localStorage.setItem("resetProgramText", editor.value);
+                            } else {
+                                localStorage.setItem("resetProgramText", editor.value);
+                                syncResetProgramTextToDevice(false);
                             }
                             updateProgramLineNumbers();
                         }
@@ -1217,10 +1315,14 @@ Gen1 OFF</textarea>
 
             status.innerText = data.programStatus || "Stopped";
             line.innerText = data.programLine || "-";
+            activeProgramEditor = data.activeProgramName === "Reset Program" ? "reset" : "program";
             const currentLineMatch = String(data.programLine || "").match(/^(\d+):/);
             setActiveProgramLine(currentLineMatch ? parseInt(currentLineMatch[1], 10) : 0);
             if (data.programSavedLength !== undefined) {
                 document.getElementById("program-saved-length").innerText = data.programSavedLength + " chars";
+            }
+            if (data.resetProgramSavedLength !== undefined) {
+                document.getElementById("reset-program-saved-length").innerText = data.resetProgramSavedLength + " chars";
             }
             if (data.programStartButtonPressed !== undefined) {
                 updateIndicator("program-button-ind", data.programStartButtonPressed);
@@ -1228,6 +1330,13 @@ Gen1 OFF</textarea>
             }
             if (data.programStartButtonPressCount !== undefined) {
                 document.getElementById("program-button-count").innerText = data.programStartButtonPressCount;
+            }
+            if (data.resetProgramButtonPressed !== undefined) {
+                updateIndicator("reset-program-button-ind", data.resetProgramButtonPressed);
+                document.getElementById("reset-program-button-state").innerText = data.resetProgramButtonPressed ? "Pressed" : "Released";
+            }
+            if (data.resetProgramButtonPressCount !== undefined) {
+                document.getElementById("reset-program-button-count").innerText = data.resetProgramButtonPressCount;
             }
         }
 
@@ -1417,6 +1526,18 @@ Gen1 OFF</textarea>
             sendWsMsg({ cmd: "program_start", program: editor.value });
         }
 
+        function runResetProgram() {
+            const editor = document.getElementById("reset-program-editor");
+            const program = editor.value.trim();
+            if (!program.length) {
+                logConsole("Reset Program is empty.", "error");
+                return;
+            }
+            localStorage.setItem("resetProgramText", editor.value);
+            logConsole("Reset Program sent to ESP32.");
+            sendWsMsg({ cmd: "reset_program_start", program: editor.value });
+        }
+
         function programEditorChanged() {
             const editor = document.getElementById("program-editor");
             localStorage.setItem("motionProgramText", editor.value);
@@ -1427,40 +1548,58 @@ Gen1 OFF</textarea>
             }, 800);
         }
 
+        function resetProgramEditorChanged() {
+            const editor = document.getElementById("reset-program-editor");
+            localStorage.setItem("resetProgramText", editor.value);
+            updateProgramLineNumbers();
+            if (resetProgramSaveTimer) clearTimeout(resetProgramSaveTimer);
+            resetProgramSaveTimer = setTimeout(function() {
+                syncResetProgramTextToDevice(false);
+            }, 800);
+        }
+
         function updateProgramLineNumbers() {
-            const editor = document.getElementById("program-editor");
-            const gutter = document.getElementById("program-line-numbers");
+            updateProgramLineNumbersFor("program");
+            updateProgramLineNumbersFor("reset");
+        }
+
+        function updateProgramLineNumbersFor(editorType) {
+            const editor = document.getElementById(editorType === "reset" ? "reset-program-editor" : "program-editor");
+            const gutter = document.getElementById(editorType === "reset" ? "reset-program-line-numbers" : "program-line-numbers");
             if (!editor || !gutter) return;
 
             const lineCount = editor.value.split("\n").length;
             let numbers = "";
             for (let lineNumber = 1; lineNumber <= lineCount; lineNumber++) {
-                const activeClass = lineNumber === activeProgramLineNumber ? " active" : "";
+                const activeClass = editorType === activeProgramEditor && lineNumber === activeProgramLineNumber ? " active" : "";
                 numbers += '<div class="program-line-number' + activeClass + '">' + lineNumber + "</div>";
             }
             gutter.innerHTML = numbers;
-            syncProgramEditorScroll();
+            syncProgramEditorScroll(editorType);
         }
 
-        function syncProgramEditorScroll() {
-            const editor = document.getElementById("program-editor");
-            const gutter = document.getElementById("program-line-numbers");
+        function syncProgramEditorScroll(editorType = "program") {
+            const editor = document.getElementById(editorType === "reset" ? "reset-program-editor" : "program-editor");
+            const gutter = document.getElementById(editorType === "reset" ? "reset-program-line-numbers" : "program-line-numbers");
             if (editor && gutter) gutter.scrollTop = editor.scrollTop;
         }
 
         function setActiveProgramLine(lineNumber) {
-            if (lineNumber === activeProgramLineNumber) return;
+            if (lineNumber === activeProgramLineNumber) {
+                updateProgramLineNumbers();
+                return;
+            }
             activeProgramLineNumber = lineNumber;
             updateProgramLineNumbers();
 
             if (lineNumber <= 0) return;
-            const editor = document.getElementById("program-editor");
+            const editor = document.getElementById(activeProgramEditor === "reset" ? "reset-program-editor" : "program-editor");
             const lineHeight = parseFloat(window.getComputedStyle(editor).lineHeight) || 21;
             const lineTop = (lineNumber - 1) * lineHeight;
             const lineBottom = lineTop + lineHeight;
             if (lineTop < editor.scrollTop || lineBottom > editor.scrollTop + editor.clientHeight) {
                 editor.scrollTop = Math.max(0, lineTop - editor.clientHeight / 2 + lineHeight / 2);
-                syncProgramEditorScroll();
+                syncProgramEditorScroll(activeProgramEditor);
             }
         }
 
@@ -1469,6 +1608,13 @@ Gen1 OFF</textarea>
             if (!editor || !ws || ws.readyState !== WebSocket.OPEN) return;
             sendWsMsg({ cmd: "program_save", program: editor.value });
             if (showLog) logConsole("Program text saved to ESP32.");
+        }
+
+        function syncResetProgramTextToDevice(showLog) {
+            const editor = document.getElementById("reset-program-editor");
+            if (!editor || !ws || ws.readyState !== WebSocket.OPEN) return;
+            sendWsMsg({ cmd: "reset_program_save", program: editor.value });
+            if (showLog) logConsole("Reset Program text saved to ESP32.");
         }
 
         function stopProgram() {
@@ -1547,6 +1693,8 @@ Gen1 OFF</textarea>
         window.addEventListener("load", function() {
             const savedProgram = localStorage.getItem("motionProgramText");
             if (savedProgram) document.getElementById("program-editor").value = savedProgram;
+            const savedResetProgram = localStorage.getItem("resetProgramText");
+            if (savedResetProgram) document.getElementById("reset-program-editor").value = savedResetProgram;
             updateProgramLineNumbers();
             initWebSocket();
         });
