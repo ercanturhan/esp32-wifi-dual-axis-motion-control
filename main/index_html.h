@@ -439,6 +439,36 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
             min-height: 260px;
         }
 
+        .program-selector {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+            padding: 5px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: #fff4e8;
+        }
+
+        .program-choice {
+            min-height: 38px;
+            border: 1px solid transparent;
+            border-radius: 6px;
+            background: transparent;
+            color: var(--primary-dark);
+            cursor: pointer;
+            font-weight: 800;
+        }
+
+        .program-choice.active {
+            color: #ffffff;
+            background: var(--primary);
+        }
+
+        .program-choice:disabled {
+            cursor: not-allowed;
+            opacity: 0.65;
+        }
+
         .program-support-card {
             grid-column: span 1;
         }
@@ -968,9 +998,17 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
                 <div class="card-title">
                     <div>
                         <h2>Sequential Program</h2>
-                        <div class="subtitle">Write one command per line. The ESP32 runs the saved text from this tab when Run Program or the GPIO34 start button is pressed.</div>
+                        <div class="subtitle">Program 1 and Program 2 have separate ESP32 memories. Run Program and GPIO34 start the selected program.</div>
                     </div>
                     <span id="program-run-badge" class="badge badge-idle">Idle</span>
+                </div>
+
+                <div class="input-group">
+                    <label>Select Program Memory</label>
+                    <div class="program-selector" role="group" aria-label="Sequential Program memory">
+                        <button id="program-choice-1" class="program-choice active" type="button" onclick="selectSequentialProgram(1)">Program 1</button>
+                        <button id="program-choice-2" class="program-choice" type="button" onclick="selectSequentialProgram(2)">Program 2</button>
+                    </div>
                 </div>
 
                 <div class="program-status">
@@ -987,7 +1025,7 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
                         <span class="stat-value" style="font-size:0.9rem">Relative</span>
                     </div>
                     <div class="stat-box">
-                        <span class="stat-label">Saved Text</span>
+                        <span class="stat-label" id="program-saved-label">Program 1 Saved</span>
                         <span class="stat-value" id="program-saved-length" style="font-size:0.9rem">0 chars</span>
                     </div>
                     <div class="stat-box">
@@ -1001,7 +1039,7 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
                 </div>
 
                 <div class="input-group">
-                    <label for="program-editor">Program Text</label>
+                    <label for="program-editor" id="program-editor-label">Program 1 Text</label>
                     <div class="program-editor-shell">
                         <div id="program-line-numbers" class="program-line-numbers" aria-hidden="true"></div>
                         <textarea id="program-editor" spellcheck="false" oninput="programEditorChanged()" onscroll="syncProgramEditorScroll()"># X and Y values are relative movement in the active motor unit
@@ -1154,6 +1192,9 @@ R3 OFF</textarea>
         let resetProgramSaveTimer = null;
         let activeProgramLineNumber = 0;
         let activeProgramEditor = "program";
+        let selectedProgramSlot = 1;
+        let programIsRunning = false;
+        const programTexts = { 1: "", 2: "" };
 
         function initWebSocket() {
             const host = window.location.hostname || "192.168.4.1";
@@ -1178,32 +1219,33 @@ R3 OFF</textarea>
                 try {
                     const data = JSON.parse(evt.data);
                     if (data.configUpdate) {
-                        if (data.savedProgramText !== undefined) {
+                        if (data.savedProgramText !== undefined || data.savedProgramText2 !== undefined) {
                             const editor = document.getElementById("program-editor");
-                            const localProgram = localStorage.getItem("motionProgramText");
-                            const savedProgramText = String(data.savedProgramText || "");
-                            if (localProgram) {
-                                editor.value = localProgram;
-                                syncProgramTextToDevice(false);
-                            } else if (savedProgramText.length) {
-                                editor.value = data.savedProgramText;
-                                localStorage.setItem("motionProgramText", editor.value);
-                            } else {
-                                localStorage.setItem("motionProgramText", editor.value);
-                                syncProgramTextToDevice(false);
-                            }
+                            const savedProgram1 = String(data.savedProgramText || "");
+                            const savedProgram2 = String(data.savedProgramText2 || "");
+                            const localProgram1 = localStorage.getItem("motionProgramText1") || localStorage.getItem("motionProgramText") || "";
+                            const localProgram2 = localStorage.getItem("motionProgramText2") || "";
+                            programTexts[1] = savedProgram1 || localProgram1 || editor.value;
+                            programTexts[2] = savedProgram2 || localProgram2;
+                            selectedProgramSlot = Number(data.selectedProgramSlot) === 2 ? 2 : 1;
+                            editor.value = programTexts[selectedProgramSlot];
+                            localStorage.setItem("motionProgramText1", programTexts[1]);
+                            localStorage.setItem("motionProgramText2", programTexts[2]);
+                            if (!savedProgram1 && programTexts[1]) syncProgramTextToDevice(false, 1, programTexts[1]);
+                            if (!savedProgram2 && programTexts[2]) syncProgramTextToDevice(false, 2, programTexts[2]);
+                            updateProgramSelector();
                             updateProgramLineNumbers();
                         }
                         if (data.savedResetProgramText !== undefined) {
                             const editor = document.getElementById("reset-program-editor");
                             const localProgram = localStorage.getItem("resetProgramText");
                             const savedProgramText = String(data.savedResetProgramText || "");
-                            if (localProgram) {
+                            if (savedProgramText.length) {
+                                editor.value = savedProgramText;
+                                localStorage.setItem("resetProgramText", savedProgramText);
+                            } else if (localProgram) {
                                 editor.value = localProgram;
                                 syncResetProgramTextToDevice(false);
-                            } else if (savedProgramText.length) {
-                                editor.value = data.savedResetProgramText;
-                                localStorage.setItem("resetProgramText", editor.value);
                             } else {
                                 localStorage.setItem("resetProgramText", editor.value);
                                 syncResetProgramTextToDevice(false);
@@ -1294,6 +1336,7 @@ R3 OFF</textarea>
 
         function updateProgramTelemetry(data) {
             if (data.programRunning === undefined) return;
+            programIsRunning = !!data.programRunning;
             const badge = document.getElementById("program-run-badge");
             const status = document.getElementById("program-status");
             const line = document.getElementById("program-line");
@@ -1321,6 +1364,11 @@ R3 OFF</textarea>
             if (data.programSavedLength !== undefined) {
                 document.getElementById("program-saved-length").innerText = data.programSavedLength + " chars";
             }
+            if (data.selectedProgramSlot !== undefined && !programIsRunning) {
+                const deviceSlot = Number(data.selectedProgramSlot) === 2 ? 2 : 1;
+                if (deviceSlot !== selectedProgramSlot) selectSequentialProgram(deviceSlot, false);
+            }
+            updateProgramSelector();
             if (data.resetProgramSavedLength !== undefined) {
                 document.getElementById("reset-program-saved-length").innerText = data.resetProgramSavedLength + " chars";
             }
@@ -1521,9 +1569,10 @@ R3 OFF</textarea>
                 logConsole("Program is empty.", "error");
                 return;
             }
-            localStorage.setItem("motionProgramText", editor.value);
-            logConsole("Program sent to ESP32.");
-            sendWsMsg({ cmd: "program_start", program: editor.value });
+            programTexts[selectedProgramSlot] = editor.value;
+            localStorage.setItem("motionProgramText" + selectedProgramSlot, editor.value);
+            logConsole("Program " + selectedProgramSlot + " sent to ESP32.");
+            sendWsMsg({ cmd: "program_start", slot: selectedProgramSlot, program: editor.value });
         }
 
         function runResetProgram() {
@@ -1540,12 +1589,53 @@ R3 OFF</textarea>
 
         function programEditorChanged() {
             const editor = document.getElementById("program-editor");
-            localStorage.setItem("motionProgramText", editor.value);
+            const editedSlot = selectedProgramSlot;
+            const editedText = editor.value;
+            programTexts[editedSlot] = editedText;
+            localStorage.setItem("motionProgramText" + editedSlot, editedText);
             updateProgramLineNumbers();
             if (programSaveTimer) clearTimeout(programSaveTimer);
             programSaveTimer = setTimeout(function() {
-                syncProgramTextToDevice(false);
+                syncProgramTextToDevice(false, editedSlot, editedText);
             }, 800);
+        }
+
+        function selectSequentialProgram(programSlot, notifyDevice = true) {
+            programSlot = Number(programSlot) === 2 ? 2 : 1;
+            if (programIsRunning && programSlot !== selectedProgramSlot) {
+                logConsole("Program selection is locked while a program is running.", "warn");
+                return;
+            }
+
+            const editor = document.getElementById("program-editor");
+            if (editor && programSlot !== selectedProgramSlot) {
+                programTexts[selectedProgramSlot] = editor.value;
+                localStorage.setItem("motionProgramText" + selectedProgramSlot, editor.value);
+                syncProgramTextToDevice(false, selectedProgramSlot, editor.value);
+                selectedProgramSlot = programSlot;
+                editor.value = programTexts[selectedProgramSlot] || "";
+                editor.scrollTop = 0;
+                activeProgramLineNumber = 0;
+            }
+
+            updateProgramSelector();
+            updateProgramLineNumbers();
+            if (notifyDevice) {
+                sendWsMsg({ cmd: "program_select", slot: selectedProgramSlot });
+                logConsole("Program " + selectedProgramSlot + " selected.");
+            }
+        }
+
+        function updateProgramSelector() {
+            for (let programSlot = 1; programSlot <= 2; programSlot++) {
+                const choice = document.getElementById("program-choice-" + programSlot);
+                if (!choice) continue;
+                choice.classList.toggle("active", programSlot === selectedProgramSlot);
+                choice.disabled = programIsRunning && programSlot !== selectedProgramSlot;
+                choice.setAttribute("aria-pressed", programSlot === selectedProgramSlot ? "true" : "false");
+            }
+            document.getElementById("program-editor-label").innerText = "Program " + selectedProgramSlot + " Text";
+            document.getElementById("program-saved-label").innerText = "Program " + selectedProgramSlot + " Saved";
         }
 
         function resetProgramEditorChanged() {
@@ -1603,11 +1693,12 @@ R3 OFF</textarea>
             }
         }
 
-        function syncProgramTextToDevice(showLog) {
+        function syncProgramTextToDevice(showLog, programSlot = selectedProgramSlot, programText = null) {
             const editor = document.getElementById("program-editor");
             if (!editor || !ws || ws.readyState !== WebSocket.OPEN) return;
-            sendWsMsg({ cmd: "program_save", program: editor.value });
-            if (showLog) logConsole("Program text saved to ESP32.");
+            const text = programText === null ? editor.value : programText;
+            sendWsMsg({ cmd: "program_save", slot: programSlot, program: text });
+            if (showLog) logConsole("Program " + programSlot + " text saved to ESP32.");
         }
 
         function syncResetProgramTextToDevice(showLog) {
@@ -1691,10 +1782,12 @@ R3 OFF</textarea>
         }
 
         window.addEventListener("load", function() {
-            const savedProgram = localStorage.getItem("motionProgramText");
-            if (savedProgram) document.getElementById("program-editor").value = savedProgram;
+            programTexts[1] = localStorage.getItem("motionProgramText1") || localStorage.getItem("motionProgramText") || document.getElementById("program-editor").value;
+            programTexts[2] = localStorage.getItem("motionProgramText2") || "";
+            document.getElementById("program-editor").value = programTexts[1];
             const savedResetProgram = localStorage.getItem("resetProgramText");
             if (savedResetProgram) document.getElementById("reset-program-editor").value = savedResetProgram;
+            updateProgramSelector();
             updateProgramLineNumbers();
             initWebSocket();
         });

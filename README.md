@@ -1,6 +1,6 @@
 # ESP32 WiFi Dual Axis Stepper Motor Control
 
-ESP32 firmware for controlling two DRV8825 stepper axes from an embedded Wi-Fi web dashboard. The interface includes live WebSocket telemetry, motor setup, homing, timed general outputs, program-controlled relay outputs, a line-by-line Run Program editor, a separate Reset Program editor, and physical start inputs.
+ESP32 firmware for controlling two DRV8825 stepper axes from an embedded Wi-Fi web dashboard. The interface includes live WebSocket telemetry, motor setup, homing, timed general outputs, program-controlled relay outputs, two selectable Sequential Program memories, a separate Reset Program editor, and physical start inputs.
 
 ## Main Features
 
@@ -13,7 +13,8 @@ ESP32 firmware for controlling two DRV8825 stepper axes from an embedded Wi-Fi w
 - WebSocket dashboard telemetry at about 5 Hz.
 - Timed `Gen.Out1` and `Gen.Out2` controls with millisecond timing.
 - Program relay manual test controls for `R1`, `R2`, and `R3`.
-- Sequential Run Program editor with line numbers and active-line tracking.
+- Sequential Run Program editor with separate Program 1 and Program 2 NVS memories.
+- Persistent Program 1 / Program 2 selection with line numbers and active-line tracking.
 - Separate Reset Program editor using the same command language.
 - Physical Run Program button on `GPIO34`.
 - Physical Reset Program button on `GPIO35`.
@@ -84,7 +85,7 @@ For direct AP mode access:
 
 If STA credentials are saved in Wi-Fi Settings, the ESP32 also joins the configured router network. Open the dashboard using the router-assigned ESP32 IP address.
 
-Dashboard tab:
+Dashboard tab - current live control layout:
 
 - Motor position, target, distance, progress, status, home switch, and driver enable telemetry.
 - Absolute move and jog controls.
@@ -101,22 +102,25 @@ Dashboard tab:
 
 ![Dashboard tab](docs/screenshots/dashboard.png)
 
-Motor Settings tab:
+Motor Settings tab - current mechanical and limit configuration layout:
 
 ![Motor Settings tab](docs/screenshots/motor-settings.png)
 
-Program tab:
+Program tab - Program 1 / Program 2 selection and Reset Program:
 
 ![Program tab](docs/screenshots/program.png)
 
 ## Program Tab
 
-The Program tab has two independent text editors:
+The Program tab has one Sequential Program editor with two selectable memories, plus a separate Reset Program editor:
 
-- `Sequential Program`: runs from the `Run Program` button or the physical `GPIO34` button.
+- `Program 1`: first Sequential Program memory, stored under `program_text`.
+- `Program 2`: second Sequential Program memory, stored under `program_2`.
 - `Reset Program`: runs from the `Reset Program` button or the physical `GPIO35` button.
 
-Both editors use the same command language. Each editor is saved separately to ESP32 NVS. The normal program uses the `program_text` key, and the reset program uses the shorter `reset_prog` key to stay within ESP32 Preferences key-length limits.
+All three memories use the same command language and are saved separately in ESP32 NVS. The selected Sequential Program slot is stored under `program_sel`. `Run Program` and the physical `GPIO34` button start whichever Sequential Program is selected. The selection is restored after restart, and a newly opened browser reads Program 1, Program 2, Reset Program, and the selected slot from ESP32 memory.
+
+The Reset Program text remains independent under the `reset_prog` key. When ESP32 memory contains a saved Reset Program, that device copy takes priority over stale browser-local data.
 
 If a program is already running, new Run Program or Reset Program start requests are ignored. The firmware waits for motor moves and homing cycles to finish before advancing to the next line.
 

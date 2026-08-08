@@ -24,6 +24,10 @@ public:
     // Sequential program text used by the web Program tab and physical start button
     bool loadProgramText(String& programText);
     bool saveProgramText(const String& programText);
+    bool loadProgramText2(String& programText);
+    bool saveProgramText2(const String& programText);
+    bool loadSelectedProgramSlot(uint8_t& programSlot);
+    bool saveSelectedProgramSlot(uint8_t programSlot);
 
     // Separate reset program text used by the Reset Program editor and physical reset button
     bool loadResetProgramText(String& programText);

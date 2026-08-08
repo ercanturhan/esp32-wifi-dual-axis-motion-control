@@ -73,7 +73,9 @@ private:
 
     String _programText;
     String _savedProgramText;
+    String _savedProgramText2;
     String _savedResetProgramText;
+    uint8_t _selectedProgramSlot;
     String _activeProgramName;
     String _programStatus;
     String _programCurrentLineText;
@@ -95,8 +97,10 @@ private:
     void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len);
     void handleWebSocketMessage(void *arg, uint8_t *data, size_t len, AsyncWebSocketClient *client);
     void processJsonCommand(JsonDocument& doc, AsyncWebSocketClient *client);
-    void startProgram(const String& programText, const String& programName, bool saveText);
-    bool saveProgramText(const String& programText);
+    void startProgram(const String& programText, const String& programName, bool saveText, int programSlot = 0);
+    bool saveProgramText(const String& programText, int programSlot);
+    bool selectProgramSlot(int programSlot);
+    const String& getSavedProgramText(int programSlot) const;
     bool saveResetProgramText(const String& programText);
     void stopProgram(bool stopOutputs);
     void updateProgram();

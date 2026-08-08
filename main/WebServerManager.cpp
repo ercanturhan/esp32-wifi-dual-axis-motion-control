@@ -6,7 +6,7 @@ WebServerManager::WebServerManager(StorageManager& storage, MotorController& m1,
     : _storage(storage), _m1(m1), _m2(m2), _r1(r1), _r2(r2),
       _programR1(programR1), _programR2(programR2), _programR3(programR3), _server(80), _ws("/ws"),
       _lastBroadcastTime(0), _hasPendingLog(false),
-      _activeProgramName("Program"), _programStatus("Stopped"),
+      _selectedProgramSlot(1), _activeProgramName("Program 1"), _programStatus("Stopped"),
       _programRunning(false), _programIndex(0), _programLineNumber(0), _programWaitingMotor(0),
       _programDelayActive(false), _programDelayStartedAt(0), _programDelayMs(0),
       _programStartButtonPressed(false), _programStartButtonPressCount(0),
@@ -40,6 +40,16 @@ void WebServerManager::begin() {
     } else {
         Serial.println("No saved Program tab text found in NVS.");
     }
+
+    _storage.loadProgramText2(_savedProgramText2);
+    if (_savedProgramText2.length() > 0) {
+        Serial.printf("Saved Program 2 text loaded from NVS (%u bytes).\n", _savedProgramText2.length());
+    } else {
+        Serial.println("No saved Program 2 text found in NVS.");
+    }
+
+    _storage.loadSelectedProgramSlot(_selectedProgramSlot);
+    Serial.printf("Selected Sequential Program: Program %u.\n", _selectedProgramSlot);
 
     _storage.loadResetProgramText(_savedResetProgramText);
     if (_savedResetProgramText.length() > 0) {
@@ -406,11 +416,22 @@ void WebServerManager::processJsonCommand(JsonDocument& doc, AsyncWebSocketClien
     }
     else if (cmd == "program_start") {
         String programText = doc["program"] | "";
-        startProgram(programText, "Program", true);
+        int programSlot = doc["slot"] | _selectedProgramSlot;
+        if (!selectProgramSlot(programSlot)) return;
+        startProgram(programText, "Program " + String(_selectedProgramSlot), true, _selectedProgramSlot);
     }
     else if (cmd == "program_save") {
         String programText = doc["program"] | "";
-        saveProgramText(programText);
+        int programSlot = doc["slot"] | _selectedProgramSlot;
+        saveProgramText(programText, programSlot);
+    }
+    else if (cmd == "program_select") {
+        int programSlot = doc["slot"] | 1;
+        if (_programRunning) {
+            queueLog("Program selection ignored because " + _activeProgramName + " is already running.");
+            return;
+        }
+        selectProgramSlot(programSlot);
     }
     else if (cmd == "reset_program_start") {
         String programText = doc["program"] | "";
@@ -494,7 +515,7 @@ void WebServerManager::processJsonCommand(JsonDocument& doc, AsyncWebSocketClien
     }
 }
 
-void WebServerManager::startProgram(const String& programText, const String& programName, bool saveText) {
+void WebServerManager::startProgram(const String& programText, const String& programName, bool saveText, int programSlot) {
     if (_programRunning) {
         queueLog(programName + " start ignored because " + _activeProgramName + " is already running.");
         return;
@@ -513,7 +534,7 @@ void WebServerManager::startProgram(const String& programText, const String& pro
     }
 
     if (saveText) {
-        bool saved = (programName == "Reset Program") ? saveResetProgramText(programText) : saveProgramText(programText);
+        bool saved = (programName == "Reset Program") ? saveResetProgramText(programText) : saveProgramText(programText, programSlot);
         if (!saved) {
             setProgramStatus("Error: save failed");
             return;
@@ -534,22 +555,50 @@ void WebServerManager::startProgram(const String& programText, const String& pro
     queueLog(programName + " started.");
 }
 
-bool WebServerManager::saveProgramText(const String& programText) {
-    if (programText.length() > PROGRAM_TEXT_MAX_LENGTH) {
-        queueLog("Program text is too long. Maximum length is " + String(PROGRAM_TEXT_MAX_LENGTH) + " characters.");
+bool WebServerManager::saveProgramText(const String& programText, int programSlot) {
+    if (programSlot != 1 && programSlot != 2) {
+        queueLog("Error: invalid Sequential Program selection.");
         return false;
     }
 
-    if (programText == _savedProgramText) return true;
+    if (programText.length() > PROGRAM_TEXT_MAX_LENGTH) {
+        queueLog("Program " + String(programSlot) + " text is too long. Maximum length is " + String(PROGRAM_TEXT_MAX_LENGTH) + " characters.");
+        return false;
+    }
 
-    if (_storage.saveProgramText(programText)) {
-        _savedProgramText = programText;
-        Serial.printf("Program text saved to NVS (%u bytes).\n", _savedProgramText.length());
+    String& savedProgramText = (programSlot == 1) ? _savedProgramText : _savedProgramText2;
+    if (programText == savedProgramText) return true;
+
+    bool saved = (programSlot == 1) ? _storage.saveProgramText(programText) : _storage.saveProgramText2(programText);
+    if (saved) {
+        savedProgramText = programText;
+        Serial.printf("Program %d text saved to NVS (%u bytes).\n", programSlot, savedProgramText.length());
         return true;
     }
 
-    queueLog("Error: program text could not be saved to flash memory.");
+    queueLog("Error: Program " + String(programSlot) + " text could not be saved to flash memory.");
     return false;
+}
+
+bool WebServerManager::selectProgramSlot(int programSlot) {
+    if (programSlot != 1 && programSlot != 2) {
+        queueLog("Error: invalid Sequential Program selection.");
+        return false;
+    }
+
+    if (_selectedProgramSlot == programSlot) return true;
+    if (!_storage.saveSelectedProgramSlot(programSlot)) {
+        queueLog("Error: selected program could not be saved to flash memory.");
+        return false;
+    }
+
+    _selectedProgramSlot = programSlot;
+    queueLog("Sequential Program " + String(programSlot) + " selected.");
+    return true;
+}
+
+const String& WebServerManager::getSavedProgramText(int programSlot) const {
+    return (programSlot == 2) ? _savedProgramText2 : _savedProgramText;
 }
 
 bool WebServerManager::saveResetProgramText(const String& programText) {
@@ -576,14 +625,15 @@ void WebServerManager::startSavedProgramFromButton() {
         queueLog("Physical program start button ignored because " + _activeProgramName + " is already running.");
         return;
     }
-    if (_savedProgramText.length() == 0) {
+    const String& savedProgramText = getSavedProgramText(_selectedProgramSlot);
+    if (savedProgramText.length() == 0) {
         setProgramStatus("Error: no saved program");
-        queueLog("Physical program start button pressed, but no Program tab text is saved.");
+        queueLog("Physical program start button pressed, but Program " + String(_selectedProgramSlot) + " is empty.");
         return;
     }
 
-    queueLog("Physical program start button pressed.");
-    startProgram(_savedProgramText, "Program", false);
+    queueLog("Physical program start button pressed. Starting Program " + String(_selectedProgramSlot) + ".");
+    startProgram(savedProgramText, "Program " + String(_selectedProgramSlot), false, _selectedProgramSlot);
 }
 
 void WebServerManager::startSavedResetProgramFromButton() {
@@ -952,7 +1002,10 @@ String WebServerManager::getTelemetryJson() {
     doc["programStatus"] = _programStatus;
     doc["activeProgramName"] = _activeProgramName;
     doc["programLine"] = _programCurrentLineText;
-    doc["programSavedLength"] = _savedProgramText.length();
+    doc["selectedProgramSlot"] = _selectedProgramSlot;
+    doc["programSavedLength"] = getSavedProgramText(_selectedProgramSlot).length();
+    doc["program1SavedLength"] = _savedProgramText.length();
+    doc["program2SavedLength"] = _savedProgramText2.length();
     doc["resetProgramSavedLength"] = _savedResetProgramText.length();
     doc["programStartButtonPin"] = PROGRAM_START_BUTTON_PIN;
     doc["programStartButtonPressed"] = _programStartButtonPressed;
@@ -975,7 +1028,7 @@ String WebServerManager::getConfigJson() {
     #if ARDUINOJSON_VERSION_MAJOR >= 7
         JsonDocument doc;
     #else
-        DynamicJsonDocument doc(14336);
+        DynamicJsonDocument doc(18432);
     #endif
     
     doc["configUpdate"] = true;
@@ -1014,6 +1067,8 @@ String WebServerManager::getConfigJson() {
     doc["sysCfg"]["timeoutActive"] = sysCfg.enableTimeoutActive;
     doc["sysCfg"]["timeoutDuration"] = sysCfg.enableTimeoutDuration;
     doc["savedProgramText"] = _savedProgramText;
+    doc["savedProgramText2"] = _savedProgramText2;
+    doc["selectedProgramSlot"] = _selectedProgramSlot;
     doc["savedResetProgramText"] = _savedResetProgramText;
     
     String output;

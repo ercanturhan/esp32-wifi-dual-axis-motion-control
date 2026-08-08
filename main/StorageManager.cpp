@@ -78,6 +78,26 @@ bool StorageManager::saveProgramText(const String& programText) {
     return _prefs.putString("program_text", programText) > 0 || programText.length() == 0;
 }
 
+bool StorageManager::loadProgramText2(String& programText) {
+    programText = _prefs.getString("program_2", "");
+    return true;
+}
+
+bool StorageManager::saveProgramText2(const String& programText) {
+    return _prefs.putString("program_2", programText) > 0 || programText.length() == 0;
+}
+
+bool StorageManager::loadSelectedProgramSlot(uint8_t& programSlot) {
+    programSlot = _prefs.getUChar("program_sel", 1);
+    if (programSlot != 1 && programSlot != 2) programSlot = 1;
+    return true;
+}
+
+bool StorageManager::saveSelectedProgramSlot(uint8_t programSlot) {
+    if (programSlot != 1 && programSlot != 2) return false;
+    return _prefs.putUChar("program_sel", programSlot) == sizeof(uint8_t);
+}
+
 bool StorageManager::loadResetProgramText(String& programText) {
     programText = _prefs.getString("reset_prog", "");
     return true;
