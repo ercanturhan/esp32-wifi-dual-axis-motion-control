@@ -201,7 +201,7 @@ arduino-cli upload -p COM6 --fqbn esp32:esp32:esp32 main
 
 ## Documentation
 
-The full wiring and setup guide is available in [walkthrough.pdf](walkthrough.pdf).
+The current wiring and setup guide is available in [walkthrough-2026-08-08.pdf](walkthrough-2026-08-08.pdf). This versioned filename avoids stale GitHub PDF previews. The same current document is also retained at [walkthrough.pdf](walkthrough.pdf).
 
 ## Versioning Notes
 
