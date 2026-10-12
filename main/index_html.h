@@ -388,6 +388,32 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
             gap: 9px;
         }
 
+        .jog-step-selector {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 7px;
+        }
+
+        .jog-step-selector .btn {
+            padding: 9px 8px;
+            background: #ffffff;
+            color: var(--text);
+            border-color: var(--border);
+        }
+
+        .jog-step-selector .btn.active {
+            color: #ffffff;
+            background: var(--primary);
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(253, 130, 8, 0.16);
+        }
+
+        .btn:disabled {
+            cursor: not-allowed;
+            opacity: 0.42;
+            box-shadow: none;
+        }
+
         .relay-grid {
             display: grid;
             grid-template-columns: 1fr;
@@ -668,10 +694,19 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
                     </div>
                 </div>
 
+                <div class="input-group">
+                    <label>Manual Move Step</label>
+                    <div class="jog-step-selector" role="group" aria-label="X axis manual move step">
+                        <button type="button" class="btn" data-jog-motor="1" data-jog-step="0.1" aria-pressed="false" onclick="setJogStep(1, 0.1)">0.1</button>
+                        <button type="button" class="btn active" data-jog-motor="1" data-jog-step="1" aria-pressed="true" onclick="setJogStep(1, 1)">1</button>
+                        <button type="button" class="btn" data-jog-motor="1" data-jog-step="10" aria-pressed="false" onclick="setJogStep(1, 10)">10</button>
+                    </div>
+                </div>
+
                 <div class="jog-grid">
-                    <button class="btn btn-warning" onclick="jogMotor(1, -10)">-10</button>
+                    <button id="m1-jog-negative" class="btn btn-warning" onclick="jogMotorByStep(1, -1)">-X</button>
                     <button class="btn btn-danger" onclick="stopMotor(1)">Stop</button>
-                    <button class="btn btn-success" onclick="jogMotor(1, 10)">+10</button>
+                    <button class="btn btn-success" onclick="jogMotorByStep(1, 1)">+X</button>
                 </div>
 
                 <div class="motor-controls">
@@ -735,10 +770,19 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
                     </div>
                 </div>
 
+                <div class="input-group">
+                    <label>Manual Move Step</label>
+                    <div class="jog-step-selector" role="group" aria-label="Y axis manual move step">
+                        <button type="button" class="btn" data-jog-motor="2" data-jog-step="0.1" aria-pressed="false" onclick="setJogStep(2, 0.1)">0.1</button>
+                        <button type="button" class="btn active" data-jog-motor="2" data-jog-step="1" aria-pressed="true" onclick="setJogStep(2, 1)">1</button>
+                        <button type="button" class="btn" data-jog-motor="2" data-jog-step="10" aria-pressed="false" onclick="setJogStep(2, 10)">10</button>
+                    </div>
+                </div>
+
                 <div class="jog-grid">
-                    <button class="btn btn-warning" onclick="jogMotor(2, -10)">-10</button>
+                    <button id="m2-jog-negative" class="btn btn-warning" onclick="jogMotorByStep(2, -1)">-Y</button>
                     <button class="btn btn-danger" onclick="stopMotor(2)">Stop</button>
-                    <button class="btn btn-success" onclick="jogMotor(2, 10)">+10</button>
+                    <button class="btn btn-success" onclick="jogMotorByStep(2, 1)">+Y</button>
                 </div>
 
                 <div class="motor-controls">
@@ -885,14 +929,14 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
                         <div class="input-group"><label>Acceleration (steps/s2)</label><input type="number" id="m1-cfg-accel" value="1000"></div>
                     </div>
                     <div class="stat-grid">
-                        <div class="input-group"><label>Software Minimum Limit (steps)</label><input type="number" id="m1-cfg-min" value="0"></div>
-                        <div class="input-group"><label>Software Maximum Limit (steps)</label><input type="number" id="m1-cfg-max" value="50000"></div>
+                        <div class="input-group"><label>Software Minimum Limit (mm)</label><input type="number" id="m1-cfg-min" step="0.01" value="0" oninput="updateLimitStepInfo(1)"><span class="subtitle" id="m1-cfg-min-steps">Calculated: 0 steps</span></div>
+                        <div class="input-group"><label>Software Maximum Limit (mm)</label><input type="number" id="m1-cfg-max" step="0.01" value="100" oninput="updateLimitStepInfo(1)"><span class="subtitle" id="m1-cfg-max-steps">Calculated: 0 steps</span></div>
                     </div>
                     <div class="stat-grid">
-                        <div class="input-group"><label>Step Angle (degrees)</label><input type="number" id="m1-cfg-angle" step="0.1" value="1.8"></div>
+                        <div class="input-group"><label>Step Angle (degrees)</label><input type="number" id="m1-cfg-angle" step="0.1" value="1.8" oninput="updateLimitStepInfo(1)"></div>
                         <div class="input-group">
                             <label>Microstep (1/x)</label>
-                            <select id="m1-cfg-usteps">
+                            <select id="m1-cfg-usteps" onchange="updateLimitStepInfo(1)">
                                 <option value="1">1 (Full)</option>
                                 <option value="2">2 (1/2)</option>
                                 <option value="4">4 (1/4)</option>
@@ -904,24 +948,38 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
                     </div>
                     <div class="input-group">
                         <label>Drive System</label>
-                        <select id="m1-cfg-drive" onchange="toggleDriveInputs(1)">
+                        <select id="m1-cfg-drive" onchange="toggleDriveInputs(1);updateLimitStepInfo(1)">
                             <option value="0" selected>Lead Screw</option>
                             <option value="1">Belt And Pulley</option>
                         </select>
                     </div>
-                    <div id="m1-drive-screw" class="input-group"><label>Lead Screw Pitch (mm/rev)</label><input type="number" id="m1-cfg-pitch" step="0.01" value="8.00"></div>
+                    <div id="m1-drive-screw" class="input-group"><label>Lead Screw Pitch (mm/rev)</label><input type="number" id="m1-cfg-pitch" step="0.01" value="8.00" oninput="updateLimitStepInfo(1)"></div>
                     <div id="m1-drive-belt" class="stat-grid" style="display:none">
-                        <div class="input-group"><label>Belt Pitch (mm)</label><input type="number" id="m1-cfg-beltpitch" step="0.01" value="2.00"></div>
-                        <div class="input-group"><label>Pulley Teeth</label><input type="number" id="m1-cfg-teeth" value="20"></div>
+                        <div class="input-group"><label>Belt Pitch (mm)</label><input type="number" id="m1-cfg-beltpitch" step="0.01" value="2.00" oninput="updateLimitStepInfo(1)"></div>
+                        <div class="input-group"><label>Pulley Teeth</label><input type="number" id="m1-cfg-teeth" value="20" oninput="updateLimitStepInfo(1)"></div>
                     </div>
                     <div class="input-group">
                         <label>Interface Unit</label>
-                        <select id="m1-cfg-unit">
+                        <select id="m1-cfg-unit" onchange="updateHomeUnitLabels(1)">
                             <option value="0">Pulse</option>
                             <option value="1" selected>Millimeter (mm)</option>
                             <option value="2">Centimeter (cm)</option>
                             <option value="3">Degree</option>
                         </select>
+                    </div>
+                    <div class="stat-box">
+                        <h3>Home Settings</h3>
+                        <div class="subtitle">Independent homing profile. Speeds and distances use the selected interface unit and remain physically consistent when microstep changes.</div>
+                        <div class="stat-grid" style="margin-top:10px">
+                            <div class="input-group"><label>Fast Search Speed (<span id="m1-home-unit-speed">mm/s</span>)</label><input type="number" id="m1-cfg-home-fast" min="0.01" step="0.01" value="4.00"></div>
+                            <div class="input-group"><label>Slow Approach Speed (<span id="m1-home-unit-slow">mm/s</span>)</label><input type="number" id="m1-cfg-home-slow" min="0.01" step="0.01" value="1.50"></div>
+                            <div class="input-group"><label>Home Acceleration (<span id="m1-home-unit-accel">mm/s2</span>)</label><input type="number" id="m1-cfg-home-accel" min="0.01" step="0.01" value="3.00"></div>
+                            <div class="input-group"><label>Extra Clearance (<span id="m1-home-unit-backoff">mm</span>)</label><input type="number" id="m1-cfg-home-backoff" min="0.01" step="0.01" value="1.00"></div>
+                            <div class="input-group"><label>Maximum Switch Release Travel (<span id="m1-home-unit-release">mm</span>)</label><input type="number" id="m1-cfg-home-max-release" min="0.01" step="0.01" value="5.00"></div>
+                            <div class="input-group"><label>Direction Settle (ms)</label><input type="number" id="m1-cfg-home-settle" min="10" max="2000" value="60"></div>
+                            <div class="input-group"><label>Switch Debounce (ms)</label><input type="number" id="m1-cfg-home-debounce" min="5" max="500" value="30"></div>
+                            <div class="input-group"><label>Search Timeout (s)</label><input type="number" id="m1-cfg-home-timeout" min="1" max="120" step="0.1" value="30"></div>
+                        </div>
                     </div>
                 </div>
 
@@ -932,14 +990,14 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
                         <div class="input-group"><label>Acceleration (steps/s2)</label><input type="number" id="m2-cfg-accel" value="1000"></div>
                     </div>
                     <div class="stat-grid">
-                        <div class="input-group"><label>Software Minimum Limit (steps)</label><input type="number" id="m2-cfg-min" value="0"></div>
-                        <div class="input-group"><label>Software Maximum Limit (steps)</label><input type="number" id="m2-cfg-max" value="100000"></div>
+                        <div class="input-group"><label>Software Minimum Limit (mm)</label><input type="number" id="m2-cfg-min" step="0.01" value="0" oninput="updateLimitStepInfo(2)"><span class="subtitle" id="m2-cfg-min-steps">Calculated: 0 steps</span></div>
+                        <div class="input-group"><label>Software Maximum Limit (mm)</label><input type="number" id="m2-cfg-max" step="0.01" value="100" oninput="updateLimitStepInfo(2)"><span class="subtitle" id="m2-cfg-max-steps">Calculated: 0 steps</span></div>
                     </div>
                     <div class="stat-grid">
-                        <div class="input-group"><label>Step Angle (degrees)</label><input type="number" id="m2-cfg-angle" step="0.1" value="1.8"></div>
+                        <div class="input-group"><label>Step Angle (degrees)</label><input type="number" id="m2-cfg-angle" step="0.1" value="1.8" oninput="updateLimitStepInfo(2)"></div>
                         <div class="input-group">
                             <label>Microstep (1/x)</label>
-                            <select id="m2-cfg-usteps">
+                            <select id="m2-cfg-usteps" onchange="updateLimitStepInfo(2)">
                                 <option value="1">1 (Full)</option>
                                 <option value="2">2 (1/2)</option>
                                 <option value="4">4 (1/4)</option>
@@ -951,24 +1009,38 @@ const char INDEX_HTML[] PROGMEM = R"rawhtml(
                     </div>
                     <div class="input-group">
                         <label>Drive System</label>
-                        <select id="m2-cfg-drive" onchange="toggleDriveInputs(2)">
+                        <select id="m2-cfg-drive" onchange="toggleDriveInputs(2);updateLimitStepInfo(2)">
                             <option value="0" selected>Lead Screw</option>
                             <option value="1">Belt And Pulley</option>
                         </select>
                     </div>
-                    <div id="m2-drive-screw" class="input-group"><label>Lead Screw Pitch (mm/rev)</label><input type="number" id="m2-cfg-pitch" step="0.01" value="8.00"></div>
+                    <div id="m2-drive-screw" class="input-group"><label>Lead Screw Pitch (mm/rev)</label><input type="number" id="m2-cfg-pitch" step="0.01" value="8.00" oninput="updateLimitStepInfo(2)"></div>
                     <div id="m2-drive-belt" class="stat-grid" style="display:none">
-                        <div class="input-group"><label>Belt Pitch (mm)</label><input type="number" id="m2-cfg-beltpitch" step="0.01" value="2.00"></div>
-                        <div class="input-group"><label>Pulley Teeth</label><input type="number" id="m2-cfg-teeth" value="20"></div>
+                        <div class="input-group"><label>Belt Pitch (mm)</label><input type="number" id="m2-cfg-beltpitch" step="0.01" value="2.00" oninput="updateLimitStepInfo(2)"></div>
+                        <div class="input-group"><label>Pulley Teeth</label><input type="number" id="m2-cfg-teeth" value="20" oninput="updateLimitStepInfo(2)"></div>
                     </div>
                     <div class="input-group">
                         <label>Interface Unit</label>
-                        <select id="m2-cfg-unit">
+                        <select id="m2-cfg-unit" onchange="updateHomeUnitLabels(2)">
                             <option value="0">Pulse</option>
                             <option value="1" selected>Millimeter (mm)</option>
                             <option value="2">Centimeter (cm)</option>
                             <option value="3">Degree</option>
                         </select>
+                    </div>
+                    <div class="stat-box">
+                        <h3>Home Settings</h3>
+                        <div class="subtitle">Independent homing profile. Speeds and distances use the selected interface unit and remain physically consistent when microstep changes.</div>
+                        <div class="stat-grid" style="margin-top:10px">
+                            <div class="input-group"><label>Fast Search Speed (<span id="m2-home-unit-speed">mm/s</span>)</label><input type="number" id="m2-cfg-home-fast" min="0.01" step="0.01" value="4.00"></div>
+                            <div class="input-group"><label>Slow Approach Speed (<span id="m2-home-unit-slow">mm/s</span>)</label><input type="number" id="m2-cfg-home-slow" min="0.01" step="0.01" value="1.50"></div>
+                            <div class="input-group"><label>Home Acceleration (<span id="m2-home-unit-accel">mm/s2</span>)</label><input type="number" id="m2-cfg-home-accel" min="0.01" step="0.01" value="3.00"></div>
+                            <div class="input-group"><label>Extra Clearance (<span id="m2-home-unit-backoff">mm</span>)</label><input type="number" id="m2-cfg-home-backoff" min="0.01" step="0.01" value="1.00"></div>
+                            <div class="input-group"><label>Maximum Switch Release Travel (<span id="m2-home-unit-release">mm</span>)</label><input type="number" id="m2-cfg-home-max-release" min="0.01" step="0.01" value="5.00"></div>
+                            <div class="input-group"><label>Direction Settle (ms)</label><input type="number" id="m2-cfg-home-settle" min="10" max="2000" value="60"></div>
+                            <div class="input-group"><label>Switch Debounce (ms)</label><input type="number" id="m2-cfg-home-debounce" min="5" max="500" value="30"></div>
+                            <div class="input-group"><label>Search Timeout (s)</label><input type="number" id="m2-cfg-home-timeout" min="1" max="120" step="0.1" value="30"></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1308,8 +1380,15 @@ R3 OFF</textarea>
             if (data[prefix + "Speed"] !== undefined) document.getElementById(prefix + "-speed").innerText = Math.round(data[prefix + "Speed"]);
             if (data[prefix + "Accel"] !== undefined) document.getElementById(prefix + "-accel").innerText = Math.round(data[prefix + "Accel"]);
 
-            updateIndicator(prefix + "-sw", data[prefix + "Sw"]);
+            const homeSwitchActive = !!data[prefix + "Sw"];
+            updateIndicator(prefix + "-sw", homeSwitchActive);
             updateIndicator(prefix + "-en", data[prefix + "En"]);
+
+            const negativeJogButton = document.getElementById(prefix + "-jog-negative");
+            negativeJogButton.disabled = homeSwitchActive;
+            negativeJogButton.title = homeSwitchActive
+                ? "Home switch is active. Movement toward home is blocked."
+                : "Move toward home";
 
             const home = document.getElementById(prefix + "-home-ok");
             if (data[prefix + "HomeOk"]) {
@@ -1421,16 +1500,76 @@ R3 OFF</textarea>
         function fillMotorConfig(id, cfg) {
             document.getElementById("m" + id + "-cfg-speed").value = cfg.maxSpeed;
             document.getElementById("m" + id + "-cfg-accel").value = cfg.acceleration;
-            document.getElementById("m" + id + "-cfg-min").value = cfg.minPosition;
-            document.getElementById("m" + id + "-cfg-max").value = cfg.maxPosition;
             document.getElementById("m" + id + "-cfg-angle").value = cfg.stepAngle;
             document.getElementById("m" + id + "-cfg-usteps").value = cfg.microsteps;
             document.getElementById("m" + id + "-cfg-drive").value = cfg.driveType;
             document.getElementById("m" + id + "-cfg-pitch").value = cfg.leadScrewPitch;
             document.getElementById("m" + id + "-cfg-beltpitch").value = cfg.beltPitch;
             document.getElementById("m" + id + "-cfg-teeth").value = cfg.pulleyTeeth;
+            const stepsPerMm = calculateStepsPerMm(cfg.stepAngle, cfg.microsteps, cfg.driveType,
+                cfg.leadScrewPitch, cfg.beltPitch, cfg.pulleyTeeth);
+            document.getElementById("m" + id + "-cfg-min").value = formatLimitMillimeters(cfg.minPosition / stepsPerMm);
+            document.getElementById("m" + id + "-cfg-max").value = formatLimitMillimeters(cfg.maxPosition / stepsPerMm);
             document.getElementById("m" + id + "-cfg-unit").value = cfg.unitType;
+            document.getElementById("m" + id + "-cfg-home-fast").value = cfg.homeFastSpeed;
+            document.getElementById("m" + id + "-cfg-home-slow").value = cfg.homeSlowSpeed;
+            document.getElementById("m" + id + "-cfg-home-accel").value = cfg.homeAcceleration;
+            document.getElementById("m" + id + "-cfg-home-backoff").value = cfg.homeBackoffDistance;
+            document.getElementById("m" + id + "-cfg-home-max-release").value = cfg.homeMaxReleaseDistance;
+            document.getElementById("m" + id + "-cfg-home-settle").value = cfg.homeDirectionSettleMs;
+            document.getElementById("m" + id + "-cfg-home-debounce").value = cfg.homeSwitchDebounceMs;
+            document.getElementById("m" + id + "-cfg-home-timeout").value = cfg.homeSearchTimeoutSec;
+            updateHomeUnitLabels(id);
             toggleDriveInputs(id);
+            updateLimitStepInfo(id);
+        }
+
+        function calculateStepsPerMm(stepAngle, microsteps, driveType, leadScrewPitch, beltPitch, pulleyTeeth) {
+            const angle = Number(stepAngle);
+            const usteps = Number(microsteps);
+            const travelPerRev = Number(driveType) === 0
+                ? Number(leadScrewPitch)
+                : Number(beltPitch) * Number(pulleyTeeth);
+            if (!Number.isFinite(angle) || angle <= 0 ||
+                !Number.isFinite(usteps) || usteps <= 0 ||
+                !Number.isFinite(travelPerRev) || travelPerRev <= 0) return NaN;
+            return (360 / angle) * usteps / travelPerRev;
+        }
+
+        function getStepsPerMmFromInputs(id) {
+            return calculateStepsPerMm(
+                document.getElementById("m" + id + "-cfg-angle").value,
+                document.getElementById("m" + id + "-cfg-usteps").value,
+                document.getElementById("m" + id + "-cfg-drive").value,
+                document.getElementById("m" + id + "-cfg-pitch").value,
+                document.getElementById("m" + id + "-cfg-beltpitch").value,
+                document.getElementById("m" + id + "-cfg-teeth").value
+            );
+        }
+
+        function formatLimitMillimeters(value) {
+            if (!Number.isFinite(value)) return "";
+            return String(Math.round(value * 10000) / 10000);
+        }
+
+        function updateLimitStepInfo(id) {
+            const stepsPerMm = getStepsPerMmFromInputs(id);
+            for (const bound of ["min", "max"]) {
+                const millimeters = parseFloat(document.getElementById("m" + id + "-cfg-" + bound).value);
+                const info = document.getElementById("m" + id + "-cfg-" + bound + "-steps");
+                info.innerText = Number.isFinite(stepsPerMm) && Number.isFinite(millimeters)
+                    ? "Calculated: " + Math.round(millimeters * stepsPerMm) + " steps (" + stepsPerMm.toFixed(3) + " steps/mm)"
+                    : "Calculated: check the mechanical settings";
+            }
+        }
+
+        function updateHomeUnitLabels(id) {
+            const unit = getUnitName(parseInt(document.getElementById("m" + id + "-cfg-unit").value, 10));
+            document.getElementById("m" + id + "-home-unit-speed").innerText = unit + "/s";
+            document.getElementById("m" + id + "-home-unit-slow").innerText = unit + "/s";
+            document.getElementById("m" + id + "-home-unit-accel").innerText = unit + "/s2";
+            document.getElementById("m" + id + "-home-unit-backoff").innerText = unit;
+            document.getElementById("m" + id + "-home-unit-release").innerText = unit;
         }
 
         function updateWsStatus(connected, text) {
@@ -1530,6 +1669,22 @@ R3 OFF</textarea>
             }
             logConsole("Motor " + motorId + " moving to " + val + ".");
             sendWsMsg({ cmd: "move", motor: motorId, val: val });
+        }
+
+        const jogSteps = { 1: 1, 2: 1 };
+
+        function setJogStep(motorId, amount) {
+            jogSteps[motorId] = amount;
+            document.querySelectorAll('[data-jog-motor="' + motorId + '"]').forEach(button => {
+                const selected = parseFloat(button.dataset.jogStep) === amount;
+                button.classList.toggle("active", selected);
+                button.setAttribute("aria-pressed", selected ? "true" : "false");
+            });
+            logConsole("Motor " + motorId + " manual move step set to " + amount + ".");
+        }
+
+        function jogMotorByStep(motorId, direction) {
+            jogMotor(motorId, direction * jogSteps[motorId]);
         }
 
         function jogMotor(motorId, amount) {
@@ -1741,10 +1896,26 @@ R3 OFF</textarea>
         }
 
         function saveMotorSettings() {
+            const m1 = readMotorConfig(1);
+            const m2 = readMotorConfig(2);
+            for (const item of [{ id: 1, cfg: m1 }, { id: 2, cfg: m2 }]) {
+                if (!Number.isFinite(item.cfg.minPosition) || !Number.isFinite(item.cfg.maxPosition)) {
+                    alert("Motor " + item.id + ": Enter valid mechanical settings and software limits in millimeters.");
+                    return;
+                }
+                if (item.cfg.minPosition > item.cfg.maxPosition) {
+                    alert("Motor " + item.id + ": Software Minimum Limit cannot be greater than Software Maximum Limit.");
+                    return;
+                }
+                if (item.cfg.homeBackoffDistance <= 0 || item.cfg.homeMaxReleaseDistance < item.cfg.homeBackoffDistance) {
+                    alert("Motor " + item.id + ": Maximum Switch Release Travel must be equal to or greater than Extra Clearance.");
+                    return;
+                }
+            }
             const cfg = {
                 cmd: "save_config",
-                m1: readMotorConfig(1),
-                m2: readMotorConfig(2),
+                m1: m1,
+                m2: m2,
                 sys: {
                     timeoutActive: document.getElementById("sys-cfg-timeout-active").value === "1",
                     timeoutDuration: parseInt(document.getElementById("sys-cfg-timeout-duration").value, 10)
@@ -1755,18 +1926,36 @@ R3 OFF</textarea>
         }
 
         function readMotorConfig(id) {
+            const stepAngle = parseFloat(document.getElementById("m" + id + "-cfg-angle").value);
+            const microsteps = parseInt(document.getElementById("m" + id + "-cfg-usteps").value, 10);
+            const driveType = parseInt(document.getElementById("m" + id + "-cfg-drive").value, 10);
+            const leadScrewPitch = parseFloat(document.getElementById("m" + id + "-cfg-pitch").value);
+            const beltPitch = parseFloat(document.getElementById("m" + id + "-cfg-beltpitch").value);
+            const pulleyTeeth = parseInt(document.getElementById("m" + id + "-cfg-teeth").value, 10);
+            const stepsPerMm = calculateStepsPerMm(stepAngle, microsteps, driveType,
+                leadScrewPitch, beltPitch, pulleyTeeth);
+            const minMillimeters = parseFloat(document.getElementById("m" + id + "-cfg-min").value);
+            const maxMillimeters = parseFloat(document.getElementById("m" + id + "-cfg-max").value);
             return {
                 maxSpeed: parseFloat(document.getElementById("m" + id + "-cfg-speed").value),
                 acceleration: parseFloat(document.getElementById("m" + id + "-cfg-accel").value),
-                minPosition: parseInt(document.getElementById("m" + id + "-cfg-min").value, 10),
-                maxPosition: parseInt(document.getElementById("m" + id + "-cfg-max").value, 10),
-                stepAngle: parseFloat(document.getElementById("m" + id + "-cfg-angle").value),
-                microsteps: parseInt(document.getElementById("m" + id + "-cfg-usteps").value, 10),
-                driveType: parseInt(document.getElementById("m" + id + "-cfg-drive").value, 10),
-                leadScrewPitch: parseFloat(document.getElementById("m" + id + "-cfg-pitch").value),
-                beltPitch: parseFloat(document.getElementById("m" + id + "-cfg-beltpitch").value),
-                pulleyTeeth: parseInt(document.getElementById("m" + id + "-cfg-teeth").value, 10),
-                unitType: parseInt(document.getElementById("m" + id + "-cfg-unit").value, 10)
+                minPosition: Math.round(minMillimeters * stepsPerMm),
+                maxPosition: Math.round(maxMillimeters * stepsPerMm),
+                stepAngle: stepAngle,
+                microsteps: microsteps,
+                driveType: driveType,
+                leadScrewPitch: leadScrewPitch,
+                beltPitch: beltPitch,
+                pulleyTeeth: pulleyTeeth,
+                unitType: parseInt(document.getElementById("m" + id + "-cfg-unit").value, 10),
+                homeFastSpeed: parseFloat(document.getElementById("m" + id + "-cfg-home-fast").value),
+                homeSlowSpeed: parseFloat(document.getElementById("m" + id + "-cfg-home-slow").value),
+                homeAcceleration: parseFloat(document.getElementById("m" + id + "-cfg-home-accel").value),
+                homeBackoffDistance: parseFloat(document.getElementById("m" + id + "-cfg-home-backoff").value),
+                homeMaxReleaseDistance: parseFloat(document.getElementById("m" + id + "-cfg-home-max-release").value),
+                homeDirectionSettleMs: parseInt(document.getElementById("m" + id + "-cfg-home-settle").value, 10),
+                homeSwitchDebounceMs: parseInt(document.getElementById("m" + id + "-cfg-home-debounce").value, 10),
+                homeSearchTimeoutSec: parseFloat(document.getElementById("m" + id + "-cfg-home-timeout").value)
             };
         }
 

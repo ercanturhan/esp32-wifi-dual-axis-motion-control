@@ -6,8 +6,8 @@ ESP32 firmware for controlling two DRV8825 stepper axes from an embedded Wi-Fi w
 
 - Two independent stepper axes using FastAccelStepper.
 - DRV8825 STEP, DIR, ENABLE, and M0/M1/M2 microstep control.
-- Active-low home switch inputs with staged homing.
-- Software min/max travel limits.
+- Active-low home switch inputs with configurable, staged two-pass homing.
+- Software min/max travel limits entered in millimeters, with live calculated step values.
 - Position units: pulse, mm, cm, or degree.
 - ESP32 AP mode plus optional STA mode for an existing Wi-Fi network.
 - WebSocket dashboard telemetry at about 5 Hz.
@@ -88,7 +88,10 @@ If STA credentials are saved in Wi-Fi Settings, the ESP32 also joins the configu
 Dashboard tab - current live control layout:
 
 - Motor position, target, distance, progress, status, home switch, and driver enable telemetry.
-- Absolute move and jog controls.
+- Absolute move controls plus independent `0.1`, `1`, and `10` manual jog-step selectors for the X and Y axes.
+- Rapid same-direction jog commands accumulate against a bounded target and cannot queue motion beyond the configured software limit.
+- An opposite jog replaces the active movement queue immediately, so direction changes do not wait for the previous target or driver auto-disable timeout.
+- When a home switch is active, negative movement toward that switch is rejected; an in-progress negative move is stopped immediately, while positive movement away from the switch remains available.
 - Home, Set Zero, Enable Driver, and Disable Driver buttons.
 - Timed `Gen.Out1` and `Gen.Out2` controls.
 - Dashboard manual ON/OFF tests for `R1`, `R2`, and `R3`.
@@ -97,6 +100,8 @@ Dashboard tab - current live control layout:
 Timed `Gen.Out1` and `Gen.Out2` durations are entered and counted in milliseconds. The default value is `5000 ms`, and the maximum is `86400000 ms` (24 hours).
 
 ## Interface Screenshots
+
+The screenshots below are retained for reference and will be refreshed separately. The feature descriptions in this README reflect the current firmware.
 
 Dashboard tab:
 
@@ -122,7 +127,7 @@ All three memories use the same command language and are saved separately in ESP
 
 The Reset Program text remains independent under the `reset_prog` key. When ESP32 memory contains a saved Reset Program, that device copy takes priority over stale browser-local data.
 
-If a program is already running, new Run Program or Reset Program start requests are ignored. The firmware waits for motor moves and homing cycles to finish before advancing to the next line.
+If a program is already running, new Run Program or Reset Program start requests are ignored. The firmware waits until each motor has both stopped and reached its accepted target before advancing to the next line. A completed homing cycle synchronizes the physical coordinate and internal target to zero, so the first relative command after `X HOME` or `Y HOME` starts from a deterministic zero position.
 
 Example:
 
@@ -163,7 +168,7 @@ Commands:
 
 Movement values use the unit selected in Motor Settings: pulse, mm, cm, or degree.
 
-Homing uses its own staged speed profile. `VX` and `VY` update the motor max speed used by part of the homing routine, but the final slow approach remains intentionally slow for repeatable home detection.
+Homing uses an independent staged speed profile. `VX` and `VY` affect normal/program movement only; they do not change the configured homing speeds or acceleration.
 
 ## Motor Settings
 
@@ -171,13 +176,14 @@ Use the Motor Settings tab to configure:
 
 - Speed limit in steps per second.
 - Acceleration in steps per second squared.
-- Software minimum and maximum limits in raw steps.
+- Software minimum and maximum limits entered in millimeters. The dashboard shows the calculated step value and `steps/mm` conversion for reference.
 - Step angle and microstep mode.
 - Lead screw pitch, or belt pitch and pulley tooth count.
 - Interface unit for the dashboard and program movement values.
+- Independent homing settings for fast-search speed, slow-approach speed, homing acceleration, extra switch clearance, maximum switch-release travel, direction-settle delay, switch debounce, and search timeout.
 - Driver auto-disable timeout.
 
-Settings are saved to ESP32 NVS and applied immediately.
+Settings are saved to ESP32 NVS and applied immediately. Homing speeds and distances use the selected interface unit and are converted to steps at runtime, keeping the physical homing behavior consistent when the microstep setting changes.
 
 ## Build And Upload
 
@@ -196,7 +202,7 @@ Example Arduino CLI commands:
 
 ```powershell
 arduino-cli compile --fqbn esp32:esp32:esp32 main
-arduino-cli upload -p COM6 --fqbn esp32:esp32:esp32 main
+arduino-cli upload -p <PORT> --fqbn esp32:esp32:esp32 main
 ```
 
 ## Documentation

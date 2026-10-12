@@ -83,6 +83,17 @@ struct MotorConfig {
     float beltPitch;       // Belt pitch in mm
     int pulleyTeeth;       // Number of teeth on pulley
     int unitType;          // 0: pulses, 1: mm, 2: cm, 3: degree
+
+    // Homing profile. Speeds and distances use the selected interface unit,
+    // so changing the microstep setting does not change physical behavior.
+    float homeFastSpeed;             // units per second
+    float homeSlowSpeed;             // units per second
+    float homeAcceleration;          // units per second^2
+    float homeBackoffDistance;       // extra clearance after switch releases, in units
+    float homeMaxReleaseDistance;    // maximum travel while waiting for switch release, in units
+    uint32_t homeDirectionSettleMs;  // pause before reversing direction
+    uint32_t homeSwitchDebounceMs;   // stable switch time
+    uint32_t homeSearchTimeoutMs;    // timeout for each home search approach
 };
 
 // Structure for WiFi Config

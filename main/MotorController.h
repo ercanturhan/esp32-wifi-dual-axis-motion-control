@@ -10,9 +10,13 @@ enum HomingState {
     HOME_IDLE = 0,
     HOME_INIT,
     HOME_FAST_BACKWARD,
+    HOME_FAST_SWITCH_CONFIRM,
+    HOME_BACKOFF_SETTLE,
     HOME_BACKING_OFF,
+    HOME_BACKOFF_CLEARANCE,
+    HOME_SLOW_APPROACH_SETTLE,
     HOME_SLOW_APPROACH,
-    HOME_COMPLETED,
+    HOME_SLOW_SWITCH_CONFIRM,
     HOME_FAILED
 };
 
@@ -31,7 +35,7 @@ public:
     // Movement commands
     bool moveTo(float targetUnit);
     bool moveAbsolute(long steps);
-    bool moveRelative(long steps);
+    bool moveRelative(long steps, bool clampToLimits = false);
     void stop();
     void startHoming();
     
@@ -55,9 +59,12 @@ public:
     float getSpeed() const;
     float getAcceleration() const;
     bool isRunning() const;
-    bool isHoming() const { return _homingState != HOME_IDLE; }
+    bool isHoming() const;
     bool isHomeCompleted() const { return _homeCompleted; }
+    bool hasHomingFailed() const { return _homingState == HOME_FAILED; }
     bool isLimitSwitchActive() const;
+    bool wasLastMoveBlockedByHomeSwitch() const { return _lastMoveBlockedByHomeSwitch; }
+    bool consumeHomeLimitEvent();
     
     // Conversion helpers
     double getStepsPerUnit() const { return _stepsPerUnit; }
@@ -90,12 +97,27 @@ private:
     HomingState _homingState;
     bool _homeCompleted;
     unsigned long _homingStartTime;
+    unsigned long _homingStateStartTime;
+
+    // Homing decisions use a debounced switch. Normal travel protection still
+    // reads the raw input so a limit hit stops the motor without added delay.
+    bool _homeSwitchRaw;
+    bool _homeSwitchStable;
+    unsigned long _homeSwitchChangedAt;
     
     // Driver Enable / Timeout Management
     bool _driverEnabled;
     bool _timeoutActive;
     uint32_t _timeoutDurationMs;
     unsigned long _lastActiveTime;
+
+    // The home switch protects the negative (homing) direction during normal moves.
+    bool _lastMoveBlockedByHomeSwitch;
+    bool _homeLimitEventPending;
+
+    // Last target accepted by this controller. FastAccelStepper publishes its
+    // target asynchronously, so rapid jog presses need a synchronous target.
+    long _plannedTarget;
     
     // Conversion factor
     double _stepsPerUnit;
@@ -103,6 +125,14 @@ private:
     
     // Apply speed/accel from config
     void applySpeedProfile();
+
+    void updateHomeSwitchDebounce();
+    void enterHomingState(HomingState state);
+    void failHoming();
+    uint32_t homeSpeedSteps(float unitsPerSecond) const;
+    uint32_t homeAccelerationSteps() const;
+    long homeDistanceSteps(float units) const;
+    void sanitizeHomeConfig();
 
     // Set M0, M1, M2 pins state
     void setMicrostepPins(int microsteps);

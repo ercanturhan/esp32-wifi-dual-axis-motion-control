@@ -1,5 +1,21 @@
 #include "WebServerManager.h"
 
+namespace {
+void sanitizeHomeSettings(MotorConfig& config) {
+    if (!isfinite(config.homeFastSpeed) || config.homeFastSpeed <= 0.0f) config.homeFastSpeed = 4.0f;
+    if (!isfinite(config.homeSlowSpeed) || config.homeSlowSpeed <= 0.0f) config.homeSlowSpeed = 1.5f;
+    if (!isfinite(config.homeAcceleration) || config.homeAcceleration <= 0.0f) config.homeAcceleration = 3.0f;
+    if (!isfinite(config.homeBackoffDistance) || config.homeBackoffDistance <= 0.0f) config.homeBackoffDistance = 1.0f;
+    if (!isfinite(config.homeMaxReleaseDistance) ||
+        config.homeMaxReleaseDistance < config.homeBackoffDistance) {
+        config.homeMaxReleaseDistance = max(5.0f, config.homeBackoffDistance);
+    }
+    config.homeDirectionSettleMs = constrain(config.homeDirectionSettleMs, 10UL, 2000UL);
+    config.homeSwitchDebounceMs = constrain(config.homeSwitchDebounceMs, 5UL, 500UL);
+    config.homeSearchTimeoutMs = constrain(config.homeSearchTimeoutMs, 1000UL, 120000UL);
+}
+}
+
 WebServerManager::WebServerManager(StorageManager& storage, MotorController& m1, MotorController& m2,
                                    RelayController& r1, RelayController& r2,
                                    RelayController& programR1, RelayController& programR2, RelayController& programR3)
@@ -73,6 +89,19 @@ void WebServerManager::begin() {
 }
 
 void WebServerManager::update() {
+    bool motor1HomeLimit = _m1.consumeHomeLimitEvent();
+    bool motor2HomeLimit = _m2.consumeHomeLimitEvent();
+    if (motor1HomeLimit || motor2HomeLimit) {
+        int motor = motor1HomeLimit ? 1 : 2;
+        if (_programRunning && _programWaitingMotor == motor) {
+            _programRunning = false;
+            _programWaitingMotor = 0;
+            _programDelayActive = false;
+            setProgramStatus("Error: home switch safety stop");
+        }
+        queueLog("Safety stop: Motor " + String(motor) + " home switch is active; movement toward home was blocked.");
+    }
+
     updateProgram();
 
     // Broadcast telemetry to WebSocket clients every 200 ms (5 Hz)
@@ -121,7 +150,10 @@ void WebServerManager::setupRoutes() {
             if (_m1.moveTo(val)) {
                 request->send(200, "application/json", "{\"status\":\"ok\"}");
             } else {
-                request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Soft limit violation\"}");
+                const char* message = _m1.wasLastMoveBlockedByHomeSwitch()
+                    ? "Home switch active; movement toward home blocked"
+                    : "Soft limit violation";
+                request->send(400, "application/json", String("{\"status\":\"error\",\"message\":\"") + message + "\"}");
             }
         } else {
             request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"JSON parse error\"}");
@@ -141,7 +173,10 @@ void WebServerManager::setupRoutes() {
             if (_m2.moveTo(val)) {
                 request->send(200, "application/json", "{\"status\":\"ok\"}");
             } else {
-                request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Soft limit violation\"}");
+                const char* message = _m2.wasLastMoveBlockedByHomeSwitch()
+                    ? "Home switch active; movement toward home blocked"
+                    : "Soft limit violation";
+                request->send(400, "application/json", String("{\"status\":\"error\",\"message\":\"") + message + "\"}");
             }
         } else {
             request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"JSON parse error\"}");
@@ -307,11 +342,15 @@ void WebServerManager::processJsonCommand(JsonDocument& doc, AsyncWebSocketClien
         float val = doc["val"] | 0.0f;
         if (motor == 1) {
             if (!_m1.moveTo(val)) {
-                queueLog("Error: Motor 1 soft limit violation.");
+                queueLog(_m1.wasLastMoveBlockedByHomeSwitch()
+                    ? "Safety stop: Motor 1 home switch is active; movement toward home was blocked."
+                    : "Error: Motor 1 soft limit violation.");
             }
         } else {
             if (!_m2.moveTo(val)) {
-                queueLog("Error: Motor 2 soft limit violation.");
+                queueLog(_m2.wasLastMoveBlockedByHomeSwitch()
+                    ? "Safety stop: Motor 2 home switch is active; movement toward home was blocked."
+                    : "Error: Motor 2 soft limit violation.");
             }
         }
     } 
@@ -320,13 +359,17 @@ void WebServerManager::processJsonCommand(JsonDocument& doc, AsyncWebSocketClien
         float val = doc["val"] | 0.0f;
         if (motor == 1) {
             long steps = _m1.unitsToSteps(val);
-            if (!_m1.moveRelative(steps)) {
-                queueLog("Error: Motor 1 soft limit violation.");
+            if (!_m1.moveRelative(steps, true)) {
+                queueLog(_m1.wasLastMoveBlockedByHomeSwitch()
+                    ? "Safety stop: Motor 1 home switch is active; movement toward home was blocked."
+                    : "Error: Motor 1 soft limit violation.");
             }
         } else {
             long steps = _m2.unitsToSteps(val);
-            if (!_m2.moveRelative(steps)) {
-                queueLog("Error: Motor 2 soft limit violation.");
+            if (!_m2.moveRelative(steps, true)) {
+                queueLog(_m2.wasLastMoveBlockedByHomeSwitch()
+                    ? "Safety stop: Motor 2 home switch is active; movement toward home was blocked."
+                    : "Error: Motor 2 soft limit violation.");
             }
         }
     }
@@ -470,6 +513,15 @@ void WebServerManager::processJsonCommand(JsonDocument& doc, AsyncWebSocketClien
             m1Cfg.beltPitch = doc["m1"]["beltPitch"] | m1Cfg.beltPitch;
             m1Cfg.pulleyTeeth = doc["m1"]["pulleyTeeth"] | m1Cfg.pulleyTeeth;
             m1Cfg.unitType = doc["m1"]["unitType"] | m1Cfg.unitType;
+            m1Cfg.homeFastSpeed = doc["m1"]["homeFastSpeed"] | m1Cfg.homeFastSpeed;
+            m1Cfg.homeSlowSpeed = doc["m1"]["homeSlowSpeed"] | m1Cfg.homeSlowSpeed;
+            m1Cfg.homeAcceleration = doc["m1"]["homeAcceleration"] | m1Cfg.homeAcceleration;
+            m1Cfg.homeBackoffDistance = doc["m1"]["homeBackoffDistance"] | m1Cfg.homeBackoffDistance;
+            m1Cfg.homeMaxReleaseDistance = doc["m1"]["homeMaxReleaseDistance"] | m1Cfg.homeMaxReleaseDistance;
+            m1Cfg.homeDirectionSettleMs = doc["m1"]["homeDirectionSettleMs"] | m1Cfg.homeDirectionSettleMs;
+            m1Cfg.homeSwitchDebounceMs = doc["m1"]["homeSwitchDebounceMs"] | m1Cfg.homeSwitchDebounceMs;
+            m1Cfg.homeSearchTimeoutMs = (uint32_t)((doc["m1"]["homeSearchTimeoutSec"] | (m1Cfg.homeSearchTimeoutMs / 1000.0f)) * 1000.0f);
+            sanitizeHomeSettings(m1Cfg);
             _storage.saveMotorConfig(1, m1Cfg);
             _m1.updateConfig(m1Cfg);
         }
@@ -488,6 +540,15 @@ void WebServerManager::processJsonCommand(JsonDocument& doc, AsyncWebSocketClien
             m2Cfg.beltPitch = doc["m2"]["beltPitch"] | m2Cfg.beltPitch;
             m2Cfg.pulleyTeeth = doc["m2"]["pulleyTeeth"] | m2Cfg.pulleyTeeth;
             m2Cfg.unitType = doc["m2"]["unitType"] | m2Cfg.unitType;
+            m2Cfg.homeFastSpeed = doc["m2"]["homeFastSpeed"] | m2Cfg.homeFastSpeed;
+            m2Cfg.homeSlowSpeed = doc["m2"]["homeSlowSpeed"] | m2Cfg.homeSlowSpeed;
+            m2Cfg.homeAcceleration = doc["m2"]["homeAcceleration"] | m2Cfg.homeAcceleration;
+            m2Cfg.homeBackoffDistance = doc["m2"]["homeBackoffDistance"] | m2Cfg.homeBackoffDistance;
+            m2Cfg.homeMaxReleaseDistance = doc["m2"]["homeMaxReleaseDistance"] | m2Cfg.homeMaxReleaseDistance;
+            m2Cfg.homeDirectionSettleMs = doc["m2"]["homeDirectionSettleMs"] | m2Cfg.homeDirectionSettleMs;
+            m2Cfg.homeSwitchDebounceMs = doc["m2"]["homeSwitchDebounceMs"] | m2Cfg.homeSwitchDebounceMs;
+            m2Cfg.homeSearchTimeoutMs = (uint32_t)((doc["m2"]["homeSearchTimeoutSec"] | (m2Cfg.homeSearchTimeoutMs / 1000.0f)) * 1000.0f);
+            sanitizeHomeSettings(m2Cfg);
             _storage.saveMotorConfig(2, m2Cfg);
             _m2.updateConfig(m2Cfg);
         }
@@ -687,10 +748,26 @@ void WebServerManager::updateProgram() {
     }
 
     if (_programWaitingMotor == 1) {
+        if (_m1.hasHomingFailed()) {
+            _programRunning = false;
+            _programWaitingMotor = 0;
+            setProgramStatus("Error: X homing failed");
+            queueLog("Program stopped: Motor 1 homing failed or the home switch did not respond.");
+            return;
+        }
         if (_m1.isRunning() || _m1.isHoming()) return;
+        if (_m1.getCurrentPosition() != _m1.getTargetPosition()) return;
         _programWaitingMotor = 0;
     } else if (_programWaitingMotor == 2) {
+        if (_m2.hasHomingFailed()) {
+            _programRunning = false;
+            _programWaitingMotor = 0;
+            setProgramStatus("Error: Y homing failed");
+            queueLog("Program stopped: Motor 2 homing failed or the home switch did not respond.");
+            return;
+        }
         if (_m2.isRunning() || _m2.isHoming()) return;
+        if (_m2.getCurrentPosition() != _m2.getTargetPosition()) return;
         _programWaitingMotor = 0;
     }
 
@@ -722,7 +799,9 @@ void WebServerManager::updateProgram() {
         if (!motor.moveRelative(steps)) {
             _programRunning = false;
             setProgramStatus("Error at line " + String(lineNumber));
-            queueLog("Program error at line " + String(lineNumber) + ": soft limit violation.");
+            queueLog("Program error at line " + String(lineNumber) + (motor.wasLastMoveBlockedByHomeSwitch()
+                ? ": home switch active; movement toward home blocked."
+                : ": soft limit violation."));
             return;
         }
         _programWaitingMotor = command.motor;
@@ -1051,6 +1130,14 @@ String WebServerManager::getConfigJson() {
     doc["m1Cfg"]["beltPitch"] = m1Cfg.beltPitch;
     doc["m1Cfg"]["pulleyTeeth"] = m1Cfg.pulleyTeeth;
     doc["m1Cfg"]["unitType"] = m1Cfg.unitType;
+    doc["m1Cfg"]["homeFastSpeed"] = m1Cfg.homeFastSpeed;
+    doc["m1Cfg"]["homeSlowSpeed"] = m1Cfg.homeSlowSpeed;
+    doc["m1Cfg"]["homeAcceleration"] = m1Cfg.homeAcceleration;
+    doc["m1Cfg"]["homeBackoffDistance"] = m1Cfg.homeBackoffDistance;
+    doc["m1Cfg"]["homeMaxReleaseDistance"] = m1Cfg.homeMaxReleaseDistance;
+    doc["m1Cfg"]["homeDirectionSettleMs"] = m1Cfg.homeDirectionSettleMs;
+    doc["m1Cfg"]["homeSwitchDebounceMs"] = m1Cfg.homeSwitchDebounceMs;
+    doc["m1Cfg"]["homeSearchTimeoutSec"] = m1Cfg.homeSearchTimeoutMs / 1000.0f;
     
     doc["m2Cfg"]["maxSpeed"] = m2Cfg.maxSpeed;
     doc["m2Cfg"]["acceleration"] = m2Cfg.acceleration;
@@ -1063,6 +1150,14 @@ String WebServerManager::getConfigJson() {
     doc["m2Cfg"]["beltPitch"] = m2Cfg.beltPitch;
     doc["m2Cfg"]["pulleyTeeth"] = m2Cfg.pulleyTeeth;
     doc["m2Cfg"]["unitType"] = m2Cfg.unitType;
+    doc["m2Cfg"]["homeFastSpeed"] = m2Cfg.homeFastSpeed;
+    doc["m2Cfg"]["homeSlowSpeed"] = m2Cfg.homeSlowSpeed;
+    doc["m2Cfg"]["homeAcceleration"] = m2Cfg.homeAcceleration;
+    doc["m2Cfg"]["homeBackoffDistance"] = m2Cfg.homeBackoffDistance;
+    doc["m2Cfg"]["homeMaxReleaseDistance"] = m2Cfg.homeMaxReleaseDistance;
+    doc["m2Cfg"]["homeDirectionSettleMs"] = m2Cfg.homeDirectionSettleMs;
+    doc["m2Cfg"]["homeSwitchDebounceMs"] = m2Cfg.homeSwitchDebounceMs;
+    doc["m2Cfg"]["homeSearchTimeoutSec"] = m2Cfg.homeSearchTimeoutMs / 1000.0f;
     
     doc["sysCfg"]["timeoutActive"] = sysCfg.enableTimeoutActive;
     doc["sysCfg"]["timeoutDuration"] = sysCfg.enableTimeoutDuration;

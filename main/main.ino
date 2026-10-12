@@ -127,8 +127,8 @@ void setup() {
     lastSavedPos1 = sysCfg.motor1LastPos;
     lastSavedPos2 = sysCfg.motor2LastPos;
     
-    Serial.printf("Motor 1 Loaded Pos: %ld, Min Limit: %ld, Max Limit: %ld\n", m1Cfg.minPosition, m1Cfg.maxPosition, lastSavedPos1);
-    Serial.printf("Motor 2 Loaded Pos: %ld, Min Limit: %ld, Max Limit: %ld\n", m2Cfg.minPosition, m2Cfg.maxPosition, lastSavedPos2);
+    Serial.printf("Motor 1 Loaded Pos: %ld, Min Limit: %ld, Max Limit: %ld\n", lastSavedPos1, m1Cfg.minPosition, m1Cfg.maxPosition);
+    Serial.printf("Motor 2 Loaded Pos: %ld, Min Limit: %ld, Max Limit: %ld\n", lastSavedPos2, m2Cfg.minPosition, m2Cfg.maxPosition);
 
     // 4. Initialize FastAccelStepper Engine
     engine.init();
